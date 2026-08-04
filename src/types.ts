@@ -1,4 +1,4 @@
-export type Source = 'habr' | 'reddit';
+export type Source = 'habr' | 'reddit' | 'cossa';
 
 export interface Candidate {
   source: Source;
