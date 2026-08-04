@@ -32,6 +32,42 @@ function getSheetId(): string {
   return id;
 }
 
+// Ширины колонок в пикселях: Дата, Источник, Заголовок, Саммари, Пост, Ссылка, Рейтинг, Статус
+const COL_WIDTHS = [110, 90, 280, 420, 420, 320, 80, 90];
+
+async function getSheetNumericId(sheets: sheets_v4.Sheets, spreadsheetId: string): Promise<number> {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheet = meta.data.sheets?.find((s) => s.properties?.title === SHEET_NAME);
+  return sheet?.properties?.sheetId ?? 0;
+}
+
+async function formatColumns(sheets: sheets_v4.Sheets, spreadsheetId: string): Promise<void> {
+  const sheetId = await getSheetNumericId(sheets, spreadsheetId);
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        // Перенос текста для всего листа
+        {
+          repeatCell: {
+            range: { sheetId, startRowIndex: 0 },
+            cell: { userEnteredFormat: { wrapStrategy: 'WRAP' } },
+            fields: 'userEnteredFormat.wrapStrategy',
+          },
+        },
+        // Ширины колонок
+        ...COL_WIDTHS.map((px, i) => ({
+          updateDimensionProperties: {
+            range: { sheetId, dimension: 'COLUMNS', startIndex: i, endIndex: i + 1 },
+            properties: { pixelSize: px },
+            fields: 'pixelSize',
+          },
+        })),
+      ],
+    },
+  });
+}
+
 export async function ensureHeader(): Promise<void> {
   const sheets = getClient();
   const spreadsheetId = getSheetId();
@@ -48,6 +84,7 @@ export async function ensureHeader(): Promise<void> {
       requestBody: { values: [HEADER] },
     });
   }
+  await formatColumns(sheets, spreadsheetId);
 }
 
 export async function getAllRows(): Promise<SheetRow[]> {
