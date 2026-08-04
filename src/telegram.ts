@@ -1,8 +1,8 @@
 export async function postToChannel(text: string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chat = process.env.TELEGRAM_CHANNEL_ID;
+  const chat = process.env.TELEGRAM_USER_ID;
   if (!token) throw new Error('TELEGRAM_BOT_TOKEN env var missing');
-  if (!chat) throw new Error('TELEGRAM_CHANNEL_ID env var missing');
+  if (!chat) throw new Error('TELEGRAM_USER_ID env var missing');
 
   const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
