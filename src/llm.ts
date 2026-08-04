@@ -1,4 +1,4 @@
-const MODEL = process.env.OPENROUTER_MODEL ?? 'anthropic/claude-haiku-4.5';
+const MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-haiku-4.5';
 
 export async function callLLM(prompt: string): Promise<string> {
   const key = process.env.OPENROUTER_API_KEY;
