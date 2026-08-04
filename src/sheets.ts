@@ -63,6 +63,26 @@ async function formatColumns(sheets: sheets_v4.Sheets, spreadsheetId: string): P
             fields: 'pixelSize',
           },
         })),
+        // Выпадающий список в колонке Статус (H, index 7), начиная со строки 2
+        {
+          setDataValidation: {
+            range: { sheetId, startRowIndex: 1, startColumnIndex: 7, endColumnIndex: 8 },
+            rule: {
+              condition: {
+                type: 'ONE_OF_LIST',
+                values: [
+                  { userEnteredValue: 'pending' },
+                  { userEnteredValue: 'approved' },
+                  { userEnteredValue: 'rejected' },
+                  { userEnteredValue: 'posted' },
+                  { userEnteredValue: 'error' },
+                ],
+              },
+              showCustomUi: true,
+              strict: false,
+            },
+          },
+        },
       ],
     },
   });
