@@ -4,8 +4,6 @@ import type { Candidate } from './types.ts';
 const HABR_HUBS = [
   'artificial_intelligence',
   'machine_learning',
-  'natural_language_processing',
-  'neural_networks',
 ];
 
 const HABR_MIN_RATING = 50;
@@ -56,35 +54,28 @@ export async function fetchHabr(): Promise<Candidate[]> {
   return out;
 }
 
-interface RedditPost {
-  data: {
-    title: string;
-    ups: number;
-    permalink: string;
-    selftext: string;
-    url: string;
-  };
+interface RedditFeedItem {
+  title?: string;
+  link?: string;
+  content?: string;
+  contentSnippet?: string;
 }
 
 export async function fetchReddit(): Promise<Candidate[]> {
-  const url = 'https://www.reddit.com/r/MachineLearning/top.json?t=day&limit=50';
+  const url = 'https://www.reddit.com/r/MachineLearning/top.rss?t=day&limit=50';
   try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'LeadGetBot/1.0 (contact: leadget)' },
-    });
-    if (!res.ok) {
-      console.error(`reddit http ${res.status}`);
-      return [];
-    }
-    const json = (await res.json()) as { data: { children: RedditPost[] } };
-    return json.data.children
-      .filter((p) => p.data.ups >= REDDIT_MIN_UPS)
-      .map((p) => ({
+    const feed = await parser.parseURL(url);
+    // RSS не содержит upvotes — берём все топ-посты за день без порога рейтинга,
+    // понижаем порог до 0 и оставляем модерацию на усмотрение редактора.
+    return (feed.items as RedditFeedItem[])
+      .filter((item) => !!item.link)
+      .slice(0, 20)
+      .map((item) => ({
         source: 'reddit' as const,
-        title: p.data.title,
-        link: `https://www.reddit.com${p.data.permalink}`,
-        rating: p.data.ups,
-        description: p.data.selftext?.slice(0, 500) || p.data.url,
+        title: item.title ?? '(без заголовка)',
+        link: item.link!,
+        rating: 0,
+        description: item.contentSnippet?.slice(0, 500) ?? item.content?.slice(0, 500) ?? '',
       }));
   } catch (e) {
     console.error('reddit fetch failed:', e);
