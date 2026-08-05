@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "collect": "tsx src/collect.ts",
-    "publish": "tsx src/publish.ts"
+    "publish": "tsx src/publish.ts",
+    "generate:articles": "tsx src/articles.ts"
   },
   "dependencies": {
     "googleapis": "^144.0.0",

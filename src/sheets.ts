@@ -170,3 +170,158 @@ export async function updateRow(
     requestBody: { valueInputOption: 'RAW', data },
   });
 }
+
+// ── Лист Articles ──────────────────────────────────────────────
+
+const ART_SHEET = 'Articles';
+const ART_HEADER = ['id', 'date', 'platform', 'sourceUrl', 'sourceTitle', 'status', 'content', 'publishedUrl'];
+const ART_COL_WIDTHS = [60, 110, 90, 300, 280, 100, 500, 300];
+
+export interface ArticleRow {
+  rowNumber: number;
+  id: string;
+  date: string;
+  platform: string;
+  sourceUrl: string;
+  sourceTitle: string;
+  status: string;
+  content: string;
+  publishedUrl: string;
+}
+
+// Создаёт лист Articles, если его нет, и применяет форматирование + валидацию статуса.
+export async function ensureArticleSheet(): Promise<void> {
+  const sheets = getClient();
+  const spreadsheetId = getSheetId();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  let sheet = meta.data.sheets?.find((s) => s.properties?.title === ART_SHEET);
+
+  if (!sheet) {
+    const res = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [{ addSheet: { properties: { title: ART_SHEET } } }],
+      },
+    });
+    const added = res.data.replies?.[0]?.addSheet;
+    sheet = { properties: added?.properties };
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${ART_SHEET}!A1:H1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [ART_HEADER] },
+    });
+  }
+
+  const sheetId = sheet.properties?.sheetId ?? 0;
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          repeatCell: {
+            range: { sheetId, startRowIndex: 0 },
+            cell: { userEnteredFormat: { wrapStrategy: 'WRAP' } },
+            fields: 'userEnteredFormat.wrapStrategy',
+          },
+        },
+        ...ART_COL_WIDTHS.map((px, i) => ({
+          updateDimensionProperties: {
+            range: { sheetId, dimension: 'COLUMNS', startIndex: i, endIndex: i + 1 },
+            properties: { pixelSize: px },
+            fields: 'pixelSize',
+          },
+        })),
+        // Выпадающий список статуса (колонка F, index 5)
+        {
+          setDataValidation: {
+            range: { sheetId, startRowIndex: 1, startColumnIndex: 5, endColumnIndex: 6 },
+            rule: {
+              condition: {
+                type: 'ONE_OF_LIST',
+                values: [
+                  { userEnteredValue: 'pending' },
+                  { userEnteredValue: 'approved' },
+                  { userEnteredValue: 'rejected' },
+                  { userEnteredValue: 'published' },
+                ],
+              },
+              showCustomUi: true,
+              strict: false,
+            },
+          },
+        },
+      ],
+    },
+  });
+}
+
+export async function getArticleRows(): Promise<ArticleRow[]> {
+  const sheets = getClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: getSheetId(),
+    range: `${ART_SHEET}!A2:H`,
+  });
+  const rows = res.data.values ?? [];
+  return rows.map((r, i) => ({
+    rowNumber: i + 2,
+    id: r[0] ?? '',
+    date: r[1] ?? '',
+    platform: r[2] ?? '',
+    sourceUrl: r[3] ?? '',
+    sourceTitle: r[4] ?? '',
+    status: (r[5] ?? '').trim().toLowerCase(),
+    content: r[6] ?? '',
+    publishedUrl: r[7] ?? '',
+  }));
+}
+
+export async function appendArticles(
+  rows: Array<{
+    id: string;
+    platform: string;
+    sourceUrl: string;
+    sourceTitle: string;
+    content: string;
+  }>,
+): Promise<void> {
+  if (rows.length === 0) return;
+  const sheets = getClient();
+  const now = new Date().toISOString().slice(0, 10);
+  const values = rows.map((r) => [
+    r.id,
+    now,
+    r.platform,
+    r.sourceUrl,
+    r.sourceTitle,
+    'pending',
+    r.content,
+    '',
+  ]);
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: getSheetId(),
+    range: `${ART_SHEET}!A:H`,
+    valueInputOption: 'RAW',
+    requestBody: { values },
+  });
+}
+
+export async function updateArticleRow(
+  rowNumber: number,
+  patch: { status?: string; publishedUrl?: string },
+): Promise<void> {
+  const sheets = getClient();
+  const spreadsheetId = getSheetId();
+  const data: sheets_v4.Schema$ValueRange[] = [];
+  if (patch.status !== undefined) {
+    data.push({ range: `${ART_SHEET}!F${rowNumber}`, values: [[patch.status]] });
+  }
+  if (patch.publishedUrl !== undefined) {
+    data.push({ range: `${ART_SHEET}!H${rowNumber}`, values: [[patch.publishedUrl]] });
+  }
+  if (data.length === 0) return;
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId,
+    requestBody: { valueInputOption: 'RAW', data },
+  });
+}
