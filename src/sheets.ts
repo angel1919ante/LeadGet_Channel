@@ -1,7 +1,7 @@
 import { google, type sheets_v4 } from 'googleapis';
 
 const SHEET_NAME = 'News';
-const HEADER = ['Дата', 'Источник', 'Заголовок', 'Саммари', 'Пост', 'Ссылка', 'Рейтинг', 'Статус'];
+const HEADER = ['Дата', 'Источник', 'Заголовок', 'Саммари', 'Пост', 'Ссылка', 'Рейтинг', 'Статус', 'Статья'];
 
 export interface SheetRow {
   rowNumber: number;
@@ -13,6 +13,7 @@ export interface SheetRow {
   link: string;
   rating: number;
   status: string;
+  article: string; // 'нет' | 'habr' | 'vc' | 'dzen' | 'x' | 'все'
 }
 
 function getClient(): sheets_v4.Sheets {
@@ -32,8 +33,8 @@ function getSheetId(): string {
   return id;
 }
 
-// Ширины колонок в пикселях: Дата, Источник, Заголовок, Саммари, Пост, Ссылка, Рейтинг, Статус
-const COL_WIDTHS = [110, 90, 280, 420, 420, 320, 80, 90];
+// Ширины колонок в пикселях: Дата, Источник, Заголовок, Саммари, Пост, Ссылка, Рейтинг, Статус, Статья
+const COL_WIDTHS = [110, 90, 280, 420, 420, 320, 80, 90, 100];
 
 async function getSheetNumericId(sheets: sheets_v4.Sheets, spreadsheetId: string): Promise<number> {
   const meta = await sheets.spreadsheets.get({ spreadsheetId });
@@ -83,6 +84,27 @@ async function formatColumns(sheets: sheets_v4.Sheets, spreadsheetId: string): P
             },
           },
         },
+        // Выпадающий список в колонке Статья (I, index 8), начиная со строки 2
+        {
+          setDataValidation: {
+            range: { sheetId, startRowIndex: 1, startColumnIndex: 8, endColumnIndex: 9 },
+            rule: {
+              condition: {
+                type: 'ONE_OF_LIST',
+                values: [
+                  { userEnteredValue: 'нет' },
+                  { userEnteredValue: 'habr' },
+                  { userEnteredValue: 'vc' },
+                  { userEnteredValue: 'dzen' },
+                  { userEnteredValue: 'x' },
+                  { userEnteredValue: 'все' },
+                ],
+              },
+              showCustomUi: true,
+              strict: false,
+            },
+          },
+        },
       ],
     },
   });
@@ -93,13 +115,21 @@ export async function ensureHeader(): Promise<void> {
   const spreadsheetId = getSheetId();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${SHEET_NAME}!A1:H1`,
+    range: `${SHEET_NAME}!A1:I1`,
   });
   const row = res.data.values?.[0] ?? [];
   if (row.length === 0) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${SHEET_NAME}!A1:H1`,
+      range: `${SHEET_NAME}!A1:I1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [HEADER] },
+    });
+  } else if (row.length < HEADER.length) {
+    // Миграция существующей таблицы: дописываем недостающие колонки заголовка
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${SHEET_NAME}!A1:I1`,
       valueInputOption: 'RAW',
       requestBody: { values: [HEADER] },
     });
@@ -111,7 +141,7 @@ export async function getAllRows(): Promise<SheetRow[]> {
   const sheets = getClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: getSheetId(),
-    range: `${SHEET_NAME}!A2:H`,
+    range: `${SHEET_NAME}!A2:I`,
   });
   const rows = res.data.values ?? [];
   return rows.map((r, i) => ({
@@ -124,6 +154,7 @@ export async function getAllRows(): Promise<SheetRow[]> {
     link: r[5] ?? '',
     rating: parseInt(r[6] ?? '0', 10),
     status: (r[7] ?? '').trim().toLowerCase(),
+    article: (r[8] ?? 'нет').trim().toLowerCase(),
   }));
 }
 
@@ -142,10 +173,11 @@ export async function appendPending(
     r.link,
     String(r.rating),
     'pending',
+    'нет',
   ]);
   await sheets.spreadsheets.values.append({
     spreadsheetId: getSheetId(),
-    range: `${SHEET_NAME}!A:H`,
+    range: `${SHEET_NAME}!A:I`,
     valueInputOption: 'RAW',
     requestBody: { values },
   });

@@ -17,20 +17,24 @@ const PLATFORM_LABEL: Record<Platform, string> = {
   x: 'X (TWITTER)',
 };
 
-const PLATFORMS: Platform[] = ['habr', 'vc', 'dzen', 'x'];
-const TOP_N = 3; // сколько лучших новостей превращаем в статьи
+const ALL_PLATFORMS: Platform[] = ['habr', 'vc', 'dzen', 'x'];
+
+function platformsFor(article: string): Platform[] {
+  const v = article.trim().toLowerCase();
+  if (v === 'все') return ALL_PLATFORMS;
+  if ((ALL_PLATFORMS as string[]).includes(v)) return [v as Platform];
+  return []; // 'нет' или пусто — статья не нужна
+}
 
 async function main(): Promise<void> {
   await ensureArticleSheet();
 
-  // Кандидаты — те же новости из листа News, топ по рейтингу
+  // Кандидаты — новости из листа News, где владелец выбрал площадку в колонке "Статья"
   const news = await getAllRows();
-  const top = [...news]
-    .sort((a, b) => b.rating - a.rating)
-    .slice(0, TOP_N);
+  const selected = news.filter((r) => platformsFor(r.article).length > 0);
 
-  if (top.length === 0) {
-    console.log('no news candidates found');
+  if (selected.length === 0) {
+    console.log('no news marked for article generation');
     return;
   }
 
@@ -46,7 +50,7 @@ async function main(): Promise<void> {
     content: string;
   }> = [];
 
-  for (const row of top) {
+  for (const row of selected) {
     const candidate: Candidate = {
       source: row.source as Source,
       title: row.title,
@@ -55,7 +59,7 @@ async function main(): Promise<void> {
       description: row.summary,
     };
 
-    for (const platform of PLATFORMS) {
+    for (const platform of platformsFor(row.article)) {
       if (seen.has(`${row.link}|${platform}`)) continue;
       try {
         const content = await callLLM(articlePrompt(candidate, platform));
