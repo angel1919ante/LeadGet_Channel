@@ -37,14 +37,20 @@ export async function fetchHabr(): Promise<Candidate[]> {
         seen.add(item.link);
         const rating = await getHabrRating(item.link);
         if (rating < hub.minRating) continue;
-        // Берём только если в тексте есть маркетинг/реклама/AI для бизнеса
+        // Нужен именно AI НА СТЫКЕ с маркетингом/рекламой/продажами —
+        // просто AI/ML-статья без бизнес-контекста не подходит.
         const text = `${item.title ?? ''} ${item.contentSnippet ?? ''}`.toLowerCase();
-        const relevant = [
+        const AI_KEYWORDS = [
+          'ии', 'искусственный интеллект', 'нейросет', 'chatgpt', 'gpt',
+          'llm', 'машинное обучение', 'machine learning', 'ai-агент', 'ai агент',
+        ];
+        const MARKETING_KEYWORDS = [
           'маркет', 'реклам', 'продаж', 'лид', 'telegram', 'телеграм',
-          'chatgpt', 'gpt', 'llm', 'автоматизац', 'бизнес', 'клиент',
-          'конверс', 'трафик', 'smm', 'таргет',
-        ].some((kw) => text.includes(kw));
-        if (!relevant) continue;
+          'конверс', 'трафик', 'smm', 'таргет', 'воронк', 'клиент',
+        ];
+        const hasAI = AI_KEYWORDS.some((kw) => text.includes(kw));
+        const hasMarketing = MARKETING_KEYWORDS.some((kw) => text.includes(kw));
+        if (!hasAI || !hasMarketing) continue;
         out.push({
           source: 'habr',
           title: item.title ?? '(без заголовка)',
