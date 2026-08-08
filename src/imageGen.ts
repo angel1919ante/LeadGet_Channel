@@ -1,20 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { callLLM } from './llm.ts';
-
-// Палитра и характер по актуальной дизайн-системе LeadGet.
-// ponytail: точный текст/логотип/сетка карточек — это отдельный SVG/HTML-рендерер,
-// не задача text-to-image; здесь только фоновая иллюстрация/маскот-окружение.
-const BRAND_STYLE = `warm cream background #F4F1EA, subtle square grid texture
-at low opacity, flat minimalist editorial illustration, forest green accent #1F7A3D,
-near-black #16120D linework, calm confident human-like mascot in black hoodie with
-long green cap and glasses if a character appears, flat shapes, thick even black
-outline, zine/sticker aesthetic, no gradients, no 3D, no photorealism, no neon,
-no glow, clean structured composition`;
-
-const NEGATIVE_PROMPT = `no robots, no drones, no cyberpunk, no neon, no purple gradients,
-no glow, no glass, no 3D render, no photorealistic people, no chibi, no oversized cartoon face,
-no random props, no text, no logos, no watermark, no busy background, no clutter`;
+import { buildConceptInstruction, buildFinalPrompt, NEGATIVE_PROMPT } from './brandDesign.ts';
 
 const REFERENCES_DIR = join(process.cwd(), 'references');
 const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp'];
@@ -43,12 +30,9 @@ function findReferenceImage(postType: string): string | undefined {
 }
 
 export async function generateImageConcept(post: string, postType: string): Promise<string> {
-  const prompt = `Ты дизайнер LeadGet. На основе поста придумай концепт картинки.
-Стиль бренда: минимализм, тёплый кремовый фон, зелёный акцент #1F7A3D, плоская
-редакционная иллюстрация без фотореализма и 3D. Без роботов, без текста на картинке.
-Тип поста: ${postType}
-Текст поста: ${post}
-Верни ТОЛЬКО готовый промпт для генерации картинки на английском, одной строкой.`;
+  const prompt = `${buildConceptInstruction(postType)}
+
+Текст поста: ${post}`;
   return callLLM(prompt);
 }
 
@@ -63,7 +47,7 @@ export async function generateImage(concept: string, postType?: string): Promise
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) throw new Error('REPLICATE_API_TOKEN env var missing');
 
-  const fullPrompt = `${concept}, ${BRAND_STYLE}, 1:1 square composition, high quality`;
+  const fullPrompt = buildFinalPrompt(concept);
   const referenceImage = postType ? findReferenceImage(postType) : undefined;
 
   const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-1.1-pro/predictions', {
