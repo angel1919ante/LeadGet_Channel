@@ -24,6 +24,53 @@ export async function postToChannel(text: string): Promise<void> {
   await sendMessage(text);
 }
 
+// Постит фото с подписью в произвольный канал через Bot API.
+// Требует, чтобы бот был администратором канала.
+export async function sendPhotoToChannel(
+  channelId: string,
+  photoUrl: string,
+  captionHtml: string,
+): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) throw new Error('TELEGRAM_BOT_TOKEN env var missing');
+
+  // Telegram caption limit is 1024 chars — send text separately if longer.
+  const CAPTION_LIMIT = 1000;
+  const caption = captionHtml.length <= CAPTION_LIMIT ? captionHtml : undefined;
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: channelId,
+      photo: photoUrl,
+      caption,
+      parse_mode: caption ? 'HTML' : undefined,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Telegram sendPhoto ${res.status}: ${err}`);
+  }
+
+  if (!caption) {
+    const textRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: channelId,
+        text: captionHtml,
+        parse_mode: 'HTML',
+      }),
+    });
+    if (!textRes.ok) {
+      const err = await textRes.text();
+      throw new Error(`Telegram sendMessage ${textRes.status}: ${err}`);
+    }
+  }
+}
+
 // Telegram limit is 4096 chars; leave headroom for the part header.
 const TG_LIMIT = 3900;
 

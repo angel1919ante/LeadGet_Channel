@@ -357,3 +357,113 @@ export async function updateArticleRow(
     requestBody: { valueInputOption: 'RAW', data },
   });
 }
+
+// ── Лист AutoPosts ─────────────────────────────────────────────
+
+const AUTO_SHEET = 'AutoPosts';
+const AUTO_HEADER = ['date', 'postType', 'sourceUrl', 'imageUrl', 'animationUrl', 'channelPosted', 'status'];
+const AUTO_COL_WIDTHS = [110, 90, 300, 300, 300, 110, 90];
+
+export interface AutoPostRow {
+  rowNumber: number;
+  date: string;
+  postType: string;
+  sourceUrl: string;
+  imageUrl: string;
+  animationUrl: string;
+  channelPosted: string;
+  status: string;
+}
+
+export async function ensureAutoPostsSheet(): Promise<void> {
+  const sheets = getClient();
+  const spreadsheetId = getSheetId();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheet = meta.data.sheets?.find((s) => s.properties?.title === AUTO_SHEET);
+
+  let sheetId: number;
+  if (!sheet) {
+    const res = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests: [{ addSheet: { properties: { title: AUTO_SHEET } } }] },
+    });
+    sheetId = res.data.replies?.[0]?.addSheet?.properties?.sheetId ?? 0;
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${AUTO_SHEET}!A1:G1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [AUTO_HEADER] },
+    });
+  } else {
+    sheetId = sheet.properties?.sheetId ?? 0;
+  }
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          repeatCell: {
+            range: { sheetId, startRowIndex: 0 },
+            cell: { userEnteredFormat: { wrapStrategy: 'WRAP' } },
+            fields: 'userEnteredFormat.wrapStrategy',
+          },
+        },
+        ...AUTO_COL_WIDTHS.map((px, i) => ({
+          updateDimensionProperties: {
+            range: { sheetId, dimension: 'COLUMNS', startIndex: i, endIndex: i + 1 },
+            properties: { pixelSize: px },
+            fields: 'pixelSize',
+          },
+        })),
+      ],
+    },
+  });
+}
+
+export async function getAutoPostRows(): Promise<AutoPostRow[]> {
+  const sheets = getClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: getSheetId(),
+    range: `${AUTO_SHEET}!A2:G`,
+  });
+  const rows = res.data.values ?? [];
+  return rows.map((r, i) => ({
+    rowNumber: i + 2,
+    date: r[0] ?? '',
+    postType: r[1] ?? '',
+    sourceUrl: r[2] ?? '',
+    imageUrl: r[3] ?? '',
+    animationUrl: r[4] ?? '',
+    channelPosted: r[5] ?? '',
+    status: (r[6] ?? '').trim().toLowerCase(),
+  }));
+}
+
+export async function appendAutoPost(row: {
+  postType: string;
+  sourceUrl: string;
+  imageUrl: string;
+  animationUrl?: string;
+  channelPosted: string;
+  status: string;
+}): Promise<void> {
+  const sheets = getClient();
+  const now = new Date().toISOString().slice(0, 10);
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: getSheetId(),
+    range: `${AUTO_SHEET}!A:G`,
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: [[
+        now,
+        row.postType,
+        row.sourceUrl,
+        row.imageUrl,
+        row.animationUrl ?? '',
+        row.channelPosted,
+        row.status,
+      ]],
+    },
+  });
+}

@@ -6,7 +6,8 @@
   "scripts": {
     "collect": "tsx src/collect.ts",
     "publish": "tsx src/publish.ts",
-    "generate:articles": "tsx src/articles.ts"
+    "generate:articles": "tsx src/articles.ts",
+    "autopost": "tsx src/autopost.ts"
   },
   "dependencies": {
     "googleapis": "^144.0.0",
