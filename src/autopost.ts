@@ -20,13 +20,13 @@ async function main(): Promise<void> {
   const posted = await getAutoPostRows();
   const alreadyPosted = new Set(posted.map((r) => r.sourceUrl));
 
-  // Берём лучшую ещё не автопощенную новость.
+  // Берём лучшую одобренную новость, которую ещё не автопостили.
   const candidateRow = [...news]
-    .filter((r) => !alreadyPosted.has(r.link))
+    .filter((r) => r.status === 'approved' && !alreadyPosted.has(r.link))
     .sort((a, b) => b.rating - a.rating)[0];
 
   if (!candidateRow) {
-    console.log('no fresh candidates for autopost');
+    console.log('no approved candidates for autopost');
     return;
   }
 
@@ -42,7 +42,7 @@ async function main(): Promise<void> {
     const rawPost = await callLLM(postPrompt(candidate));
     const formatted = await formatPost(rawPost);
     const concept = await generateImageConcept(rawPost, POST_TYPE);
-    const imageUrl = await generateImage(concept);
+    const imageUrl = await generateImage(concept, POST_TYPE);
 
     await sendPhotoToChannel(channel, imageUrl, formatted);
 

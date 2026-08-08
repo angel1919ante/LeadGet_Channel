@@ -1,19 +1,51 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { callLLM } from './llm.ts';
 
-const BRAND_STYLE = `industrial editorial, warm bone paper background,
-forest green accent #1F7A3D, blueprint grid texture subtle,
-hard letterpress offset shadows, marker highlight signature,
-confident operator visual language, Russian B2B brand,
-clean minimal composition, no people, no faces, no text`;
+// Палитра и характер по актуальной дизайн-системе LeadGet.
+// ponytail: точный текст/логотип/сетка карточек — это отдельный SVG/HTML-рендерер,
+// не задача text-to-image; здесь только фоновая иллюстрация/маскот-окружение.
+const BRAND_STYLE = `warm cream background #F4F1EA, subtle square grid texture
+at low opacity, flat minimalist editorial illustration, forest green accent #1F7A3D,
+near-black #16120D linework, calm confident human-like mascot in black hoodie with
+long green cap and glasses if a character appears, flat shapes, thick even black
+outline, zine/sticker aesthetic, no gradients, no 3D, no photorealism, no neon,
+no glow, clean structured composition`;
 
-const NEGATIVE_PROMPT = `no people, no faces, no hands, no text, no watermark,
-no clipart, no stock photo look, no neon colors,
-no busy composition, no gradients unrelated to brand`;
+const NEGATIVE_PROMPT = `no robots, no drones, no cyberpunk, no neon, no purple gradients,
+no glow, no glass, no 3D render, no photorealistic people, no chibi, no oversized cartoon face,
+no random props, no text, no logos, no watermark, no busy background, no clutter`;
+
+const REFERENCES_DIR = join(process.cwd(), 'references');
+const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp'];
+
+// Тип поста → папка с референсами. Пока используется только 'новость'.
+const POST_TYPE_FOLDER: Record<string, string> = {
+  'новость': 'news',
+  'фича': 'feature',
+  'кейс': 'case',
+};
+
+function findReferenceImage(postType: string): string | undefined {
+  const folder = POST_TYPE_FOLDER[postType];
+  if (!folder) return undefined;
+  const dir = join(REFERENCES_DIR, folder);
+  try {
+    const file = readdirSync(dir).find((f) => IMAGE_EXT.includes(f.slice(f.lastIndexOf('.')).toLowerCase()));
+    if (!file) return undefined;
+    const buf = readFileSync(join(dir, file));
+    const ext = file.slice(file.lastIndexOf('.') + 1).toLowerCase();
+    const mime = ext === 'jpg' ? 'jpeg' : ext;
+    return `data:image/${mime};base64,${buf.toString('base64')}`;
+  } catch {
+    return undefined;
+  }
+}
 
 export async function generateImageConcept(post: string, postType: string): Promise<string> {
   const prompt = `Ты дизайнер LeadGet. На основе поста придумай концепт картинки.
-Стиль бренда: industrial editorial, тёплая бумага, зелёный акцент #1F7A3D,
-blueprint grid, letterpress тени, B2B оператор. Без людей, без текста.
+Стиль бренда: минимализм, тёплый кремовый фон, зелёный акцент #1F7A3D, плоская
+редакционная иллюстрация без фотореализма и 3D. Без роботов, без текста на картинке.
 Тип поста: ${postType}
 Текст поста: ${post}
 Верни ТОЛЬКО готовый промпт для генерации картинки на английском, одной строкой.`;
@@ -22,11 +54,17 @@ blueprint grid, letterpress тени, B2B оператор. Без людей, �
 
 // ponytail: raw fetch to Replicate REST API instead of the `replicate` SDK —
 // this file already needs only create+poll, matches the fetch-based style of llm.ts/telegram.ts.
-export async function generateImage(concept: string): Promise<string> {
+//
+// Если в references/<postType>/ лежит картинка, передаём её как image_prompt
+// (Flux Redux-style reference). ВАЖНО: этот параметр не проверен живым вызовом
+// (нет доступа к REPLICATE_API_TOKEN отсюда) — при первом реальном запуске
+// с референсом стоит свериться с логами Replicate, что параметр принят.
+export async function generateImage(concept: string, postType?: string): Promise<string> {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) throw new Error('REPLICATE_API_TOKEN env var missing');
 
   const fullPrompt = `${concept}, ${BRAND_STYLE}, 1:1 square composition, high quality`;
+  const referenceImage = postType ? findReferenceImage(postType) : undefined;
 
   const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-1.1-pro/predictions', {
     method: 'POST',
@@ -43,6 +81,7 @@ export async function generateImage(concept: string): Promise<string> {
         height: 1024,
         output_format: 'jpg',
         output_quality: 90,
+        ...(referenceImage ? { image_prompt: referenceImage } : {}),
       },
     }),
   });
