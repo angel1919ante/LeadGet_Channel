@@ -1,12 +1,12 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { callLLM } from './llm.ts';
-import { buildConceptInstruction, buildFinalPrompt, NEGATIVE_PROMPT } from './brandDesign.ts';
+import { buildConceptInstruction, buildAnimationPrompt, buildFinalPrompt, NEGATIVE_PROMPT } from './brandDesign.ts';
 
 const REFERENCES_DIR = join(process.cwd(), 'references');
 const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp'];
 
-// Тип поста → папка с референсами. Пока используется только 'новость'.
+// Тип поста → папка с референсами.
 const POST_TYPE_FOLDER: Record<string, string> = {
   'новость': 'news',
   'фича': 'feature',
@@ -99,5 +99,60 @@ export async function generateImage(concept: string, postType?: string): Promise
   const output = prediction.output;
   const url = Array.isArray(output) ? output[0] : output;
   if (!url) throw new Error('Replicate returned no output URL');
+  return url;
+}
+
+// wan2.1-i2v-480p: берёт готовую картинку и анимирует её.
+// Используется только для фич-постов (⚡).
+export async function generateAnimation(imageUrl: string, concept: string): Promise<string> {
+  const token = process.env.REPLICATE_API_TOKEN;
+  if (!token) throw new Error('REPLICATE_API_TOKEN env var missing');
+
+  const animPrompt = buildAnimationPrompt(concept);
+
+  const createRes = await fetch('https://api.replicate.com/v1/models/wan-video/wan2.1-i2v-480p/predictions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Prefer: 'wait',
+    },
+    body: JSON.stringify({
+      input: {
+        image: imageUrl,
+        prompt: animPrompt,
+        num_frames: 81,
+        frames_per_second: 16,
+      },
+    }),
+  });
+
+  if (!createRes.ok) {
+    const err = await createRes.text();
+    throw new Error(`Replicate wan2.1 ${createRes.status}: ${err}`);
+  }
+
+  let prediction = (await createRes.json()) as {
+    id: string;
+    status: string;
+    output?: string | string[];
+    urls: { get: string };
+  };
+
+  while (prediction.status !== 'succeeded' && prediction.status !== 'failed' && prediction.status !== 'canceled') {
+    await new Promise((r) => setTimeout(r, 4000));
+    const pollRes = await fetch(prediction.urls.get, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    prediction = await pollRes.json();
+  }
+
+  if (prediction.status !== 'succeeded') {
+    throw new Error(`Replicate wan2.1 prediction ${prediction.status}`);
+  }
+
+  const output = prediction.output;
+  const url = Array.isArray(output) ? output[0] : output;
+  if (!url) throw new Error('Replicate wan2.1 returned no output URL');
   return url;
 }
