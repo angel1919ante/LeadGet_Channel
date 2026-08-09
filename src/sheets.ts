@@ -467,3 +467,284 @@ export async function appendAutoPost(row: {
     },
   });
 }
+
+// ── Лист ContentPlan ────────────────────────────────────────────
+// Колонки: Дата | Тип | Заголовок | Токен | Данные | Статус | Пост
+// Дата: DD.MM.YYYY, Тип: новость/кейс/фича
+// Данные: JSON — для кейса: {niche, task, mechanics?, price?}
+//                для фичи: {problem, description}
+
+const CP_SHEET = 'ContentPlan';
+const CP_HEADER = ['Дата', 'Тип', 'Заголовок', 'Токен', 'Данные', 'Статус', 'Пост'];
+const CP_COL_WIDTHS = [110, 90, 200, 260, 320, 100, 500];
+
+export interface ContentPlanRow {
+  rowNumber: number;
+  date: string;
+  type: string;     // новость | кейс | фича
+  title: string;
+  token: string;    // campaign token for кейс
+  data: string;     // JSON string with extra fields
+  status: string;   // draft | approved | posted | error
+  post: string;
+}
+
+async function ensureSheetExists(
+  sheets: sheets_v4.Sheets,
+  spreadsheetId: string,
+  title: string,
+  header: string[],
+  colWidths: number[],
+  extraRequests?: sheets_v4.Schema$Request[],
+): Promise<number> {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const existing = meta.data.sheets?.find((s) => s.properties?.title === title);
+  let sheetId: number;
+
+  if (!existing) {
+    const res = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests: [{ addSheet: { properties: { title } } }] },
+    });
+    sheetId = res.data.replies?.[0]?.addSheet?.properties?.sheetId ?? 0;
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${title}!A1:${String.fromCharCode(64 + header.length)}1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [header] },
+    });
+  } else {
+    sheetId = existing.properties?.sheetId ?? 0;
+  }
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          repeatCell: {
+            range: { sheetId, startRowIndex: 0 },
+            cell: { userEnteredFormat: { wrapStrategy: 'WRAP' } },
+            fields: 'userEnteredFormat.wrapStrategy',
+          },
+        },
+        ...colWidths.map((px, i) => ({
+          updateDimensionProperties: {
+            range: { sheetId, dimension: 'COLUMNS', startIndex: i, endIndex: i + 1 },
+            properties: { pixelSize: px },
+            fields: 'pixelSize',
+          },
+        })),
+        ...(extraRequests?.map((r) => {
+          // inject sheetId into range fields that need it
+          const req = JSON.parse(JSON.stringify(r)) as sheets_v4.Schema$Request;
+          const target = req.setDataValidation?.range ?? req.repeatCell?.range;
+          if (target && target.sheetId === undefined) target.sheetId = sheetId;
+          return req;
+        }) ?? []),
+      ],
+    },
+  });
+
+  return sheetId;
+}
+
+export async function ensureContentPlanSheet(): Promise<void> {
+  const sheets = getClient();
+  const spreadsheetId = getSheetId();
+  await ensureSheetExists(sheets, spreadsheetId, CP_SHEET, CP_HEADER, CP_COL_WIDTHS, [
+    {
+      setDataValidation: {
+        range: { startRowIndex: 1, startColumnIndex: 1, endColumnIndex: 2 },
+        rule: {
+          condition: {
+            type: 'ONE_OF_LIST',
+            values: [
+              { userEnteredValue: 'новость' },
+              { userEnteredValue: 'кейс' },
+              { userEnteredValue: 'фича' },
+            ],
+          },
+          showCustomUi: true,
+          strict: false,
+        },
+      },
+    },
+    {
+      setDataValidation: {
+        range: { startRowIndex: 1, startColumnIndex: 5, endColumnIndex: 6 },
+        rule: {
+          condition: {
+            type: 'ONE_OF_LIST',
+            values: [
+              { userEnteredValue: 'draft' },
+              { userEnteredValue: 'approved' },
+              { userEnteredValue: 'posted' },
+              { userEnteredValue: 'error' },
+            ],
+          },
+          showCustomUi: true,
+          strict: false,
+        },
+      },
+    },
+  ]);
+}
+
+export async function getContentPlanRows(): Promise<ContentPlanRow[]> {
+  const sheets = getClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: getSheetId(),
+    range: `${CP_SHEET}!A2:G`,
+  });
+  return (res.data.values ?? []).map((r, i) => ({
+    rowNumber: i + 2,
+    date: r[0] ?? '',
+    type: (r[1] ?? '').trim().toLowerCase(),
+    title: r[2] ?? '',
+    token: r[3] ?? '',
+    data: r[4] ?? '',
+    status: (r[5] ?? '').trim().toLowerCase(),
+    post: r[6] ?? '',
+  }));
+}
+
+export async function updateContentPlanRow(
+  rowNumber: number,
+  patch: { status?: string; post?: string },
+): Promise<void> {
+  const sheets = getClient();
+  const data: sheets_v4.Schema$ValueRange[] = [];
+  if (patch.status !== undefined) data.push({ range: `${CP_SHEET}!F${rowNumber}`, values: [[patch.status]] });
+  if (patch.post !== undefined) data.push({ range: `${CP_SHEET}!G${rowNumber}`, values: [[patch.post]] });
+  if (data.length === 0) return;
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: getSheetId(),
+    requestBody: { valueInputOption: 'RAW', data },
+  });
+}
+
+// ── Лист Features ───────────────────────────────────────────────
+// Справочник фич: пользователь заполняет идеи, потом ссылается в ContentPlan.
+// Колонки: Дата | Название | Проблема | Описание | Статус
+
+const FEAT_SHEET = 'Features';
+const FEAT_HEADER = ['Дата', 'Название', 'Проблема', 'Описание', 'Статус'];
+const FEAT_COL_WIDTHS = [110, 200, 300, 400, 100];
+
+export async function ensureFeaturesSheet(): Promise<void> {
+  const sheets = getClient();
+  const spreadsheetId = getSheetId();
+  await ensureSheetExists(sheets, spreadsheetId, FEAT_SHEET, FEAT_HEADER, FEAT_COL_WIDTHS, [
+    {
+      setDataValidation: {
+        range: { startRowIndex: 1, startColumnIndex: 4, endColumnIndex: 5 },
+        rule: {
+          condition: {
+            type: 'ONE_OF_LIST',
+            values: [
+              { userEnteredValue: 'draft' },
+              { userEnteredValue: 'approved' },
+              { userEnteredValue: 'posted' },
+            ],
+          },
+          showCustomUi: true,
+          strict: false,
+        },
+      },
+    },
+  ]);
+}
+
+// ── Лист Cases ──────────────────────────────────────────────────
+// Кандидаты на кейс-посты из LeadGet.
+// Колонки: Дата | Клиент | Токен | Ниша | Отправлено | Лиды | Конверсия% | Статус
+
+const CASES_SHEET = 'Cases';
+const CASES_HEADER = ['Дата', 'Клиент', 'Токен', 'Ниша', 'Отправлено', 'Лиды', 'Конверсия%', 'Статус'];
+const CASES_COL_WIDTHS = [110, 180, 260, 180, 110, 80, 110, 100];
+
+export interface CasesRow {
+  rowNumber: number;
+  date: string;
+  client: string;
+  token: string;
+  niche: string;
+  sent: number;
+  leads: number;
+  conversion: number;
+  status: string;
+}
+
+export async function ensureCasesSheet(): Promise<void> {
+  const sheets = getClient();
+  const spreadsheetId = getSheetId();
+  await ensureSheetExists(sheets, spreadsheetId, CASES_SHEET, CASES_HEADER, CASES_COL_WIDTHS, [
+    {
+      setDataValidation: {
+        range: { startRowIndex: 1, startColumnIndex: 7, endColumnIndex: 8 },
+        rule: {
+          condition: {
+            type: 'ONE_OF_LIST',
+            values: [
+              { userEnteredValue: 'pending' },
+              { userEnteredValue: 'approved' },
+              { userEnteredValue: 'posted' },
+              { userEnteredValue: 'skip' },
+            ],
+          },
+          showCustomUi: true,
+          strict: false,
+        },
+      },
+    },
+  ]);
+}
+
+export async function getCasesRows(): Promise<CasesRow[]> {
+  const sheets = getClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: getSheetId(),
+    range: `${CASES_SHEET}!A2:H`,
+  });
+  return (res.data.values ?? []).map((r, i) => ({
+    rowNumber: i + 2,
+    date: r[0] ?? '',
+    client: r[1] ?? '',
+    token: r[2] ?? '',
+    niche: r[3] ?? '',
+    sent: parseInt(r[4] ?? '0', 10),
+    leads: parseInt(r[5] ?? '0', 10),
+    conversion: parseFloat(r[6] ?? '0'),
+    status: (r[7] ?? '').trim().toLowerCase(),
+  }));
+}
+
+export async function appendCaseCandidate(row: {
+  client: string;
+  token: string;
+  niche: string;
+  sent: number;
+  leads: number;
+  conversion: number;
+}): Promise<void> {
+  const sheets = getClient();
+  const now = new Date().toISOString().slice(0, 10);
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: getSheetId(),
+    range: `${CASES_SHEET}!A:H`,
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: [[
+        now,
+        row.client,
+        row.token,
+        row.niche,
+        String(row.sent),
+        String(row.leads),
+        row.conversion.toFixed(1),
+        'pending',
+      ]],
+    },
+  });
+}

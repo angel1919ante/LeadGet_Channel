@@ -1,74 +1,141 @@
-import { ensureHeader, getAllRows, ensureAutoPostsSheet, getAutoPostRows, appendAutoPost } from './sheets.ts';
+import {
+  ensureHeader,
+  getAllRows,
+  ensureAutoPostsSheet,
+  appendAutoPost,
+  ensureContentPlanSheet,
+  getContentPlanRows,
+  updateContentPlanRow,
+  ensureFeaturesSheet,
+  ensureCasesSheet,
+  type ContentPlanRow,
+} from './sheets.ts';
 import { callLLM } from './llm.ts';
-import { postPrompt } from './prompts.ts';
+import { postPrompt, featurePostPrompt } from './prompts.ts';
 import { generateImageConcept, generateImage } from './imageGen.ts';
 import { formatPost } from './formatter.ts';
 import { postAsUser, sendPhotoAsUser, disconnectMTProto } from './mtproto.ts';
+import { generateCasePost } from './caseGen.ts';
 import type { Candidate, Source } from './types.ts';
 
-// Этап 1: только новостные посты, только тестовый канал.
-const POST_TYPE = 'новость';
+const channel = process.env.POST_CHANNEL;
 
-async function main(): Promise<void> {
-  await ensureHeader();
-  await ensureAutoPostsSheet();
+// Формат даты в ContentPlan: DD.MM.YYYY
+function todayDMY(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
+}
 
-  const channel = process.env.POST_CHANNEL;
+async function postAndRecord(
+  postType: string,
+  postText: string,
+  sourceRef: string,
+): Promise<void> {
   if (!channel) throw new Error('POST_CHANNEL env var missing');
+  const skipImage = process.env.SKIP_IMAGE === 'true';
+  let imageUrl = '';
 
+  if (skipImage) {
+    await postAsUser(channel, postText);
+  } else {
+    const concept = await generateImageConcept(postText, postType);
+    imageUrl = await generateImage(concept, postType);
+    await sendPhotoAsUser(channel, imageUrl, postText);
+  }
+
+  await appendAutoPost({ postType, sourceUrl: sourceRef, imageUrl, channelPosted: channel!, status: 'success' });
+  console.log(`posted [${postType}]: ${sourceRef.slice(0, 60)}`);
+}
+
+async function handleNews(planRow: ContentPlanRow): Promise<string> {
   const news = await getAllRows();
-  const posted = await getAutoPostRows();
-  const alreadyPosted = new Set(posted.filter((r) => r.status === 'success').map((r) => r.sourceUrl));
+  const alreadyPosted = new Set(
+    (await import('./sheets.ts').then((m) => m.getAutoPostRows()))
+      .filter((r) => r.status === 'success')
+      .map((r) => r.sourceUrl),
+  );
 
-  console.log(`total rows: ${news.length}, already posted: ${alreadyPosted.size}`);
-  console.log('statuses:', [...new Set(news.map((r) => `"${r.status}"`))].join(', '));
-
-  // Берём лучшую одобренную новость, которую ещё не автопостили.
-  const candidateRow = [...news]
+  const candidate = [...news]
     .filter((r) => r.status === 'approved' && !alreadyPosted.has(r.link))
     .sort((a, b) => b.rating - a.rating)[0];
 
-  if (!candidateRow) {
-    console.log('no approved candidates for autopost');
+  if (!candidate) throw new Error('нет одобренных новостей для автопоста');
+
+  const c: Candidate = {
+    source: candidate.source as Source,
+    title: candidate.title,
+    link: candidate.link,
+    rating: candidate.rating,
+    description: candidate.summary,
+  };
+  return callLLM(postPrompt(c));
+}
+
+async function handleFeature(planRow: ContentPlanRow): Promise<string> {
+  let data: Record<string, string> = {};
+  try {
+    data = planRow.data ? JSON.parse(planRow.data) : {};
+  } catch {
+    console.warn('ContentPlan Данные не JSON');
+  }
+  const problem = data.problem ?? '';
+  const description = data.description ?? '';
+  if (!problem || !description) throw new Error('для фичи нужны поля problem и description в Данных');
+  return callLLM(featurePostPrompt(planRow.title, problem, description));
+}
+
+async function main(): Promise<void> {
+  if (!channel) throw new Error('POST_CHANNEL env var missing');
+
+  await Promise.all([
+    ensureHeader(),
+    ensureAutoPostsSheet(),
+    ensureContentPlanSheet(),
+    ensureFeaturesSheet(),
+    ensureCasesSheet(),
+  ]);
+
+  const today = todayDMY();
+  console.log(`autopost: today=${today}`);
+
+  const plans = await getContentPlanRows();
+  const planRow = plans.find((r) => r.date === today && r.status === 'approved');
+
+  if (!planRow) {
+    console.log(`нет approved строки в ContentPlan на ${today}`);
     return;
   }
 
-  const candidate: Candidate = {
-    source: candidateRow.source as Source,
-    title: candidateRow.title,
-    link: candidateRow.link,
-    rating: candidateRow.rating,
-    description: candidateRow.summary,
-  };
+  console.log(`plan: type=${planRow.type} title="${planRow.title}"`);
 
-  const skipImage = process.env.SKIP_IMAGE === 'true';
+  let rawPost: string;
+  let sourceRef: string;
 
   try {
-    const rawPost = await callLLM(postPrompt(candidate));
-    const formatted = await formatPost(rawPost);
-
-    let imageUrl = '';
-    if (skipImage) {
-      await postAsUser(channel, formatted);
+    if (planRow.type === 'новость') {
+      rawPost = await handleNews(planRow);
+      sourceRef = 'news-auto';
+    } else if (planRow.type === 'кейс') {
+      if (!planRow.token) throw new Error('для кейса нужен Токен в ContentPlan');
+      rawPost = await generateCasePost(planRow);
+      sourceRef = `leadget:${planRow.token}`;
+    } else if (planRow.type === 'фича') {
+      rawPost = await handleFeature(planRow);
+      sourceRef = `feature:${planRow.title}`;
     } else {
-      const concept = await generateImageConcept(rawPost, POST_TYPE);
-      imageUrl = await generateImage(concept, POST_TYPE);
-      await sendPhotoAsUser(channel, imageUrl, formatted);
+      throw new Error(`неизвестный тип: ${planRow.type}`);
     }
 
-    await appendAutoPost({
-      postType: POST_TYPE,
-      sourceUrl: candidateRow.link,
-      imageUrl,
-      channelPosted: channel,
-      status: 'success',
-    });
-    console.log(`autoposted: ${candidateRow.title.slice(0, 60)}`);
+    const formatted = await formatPost(rawPost);
+    await postAndRecord(planRow.type, formatted, sourceRef);
+    await updateContentPlanRow(planRow.rowNumber, { status: 'posted', post: formatted });
   } catch (e) {
     console.error('autopost failed:', e);
+    await updateContentPlanRow(planRow.rowNumber, { status: 'error' });
     await appendAutoPost({
-      postType: POST_TYPE,
-      sourceUrl: candidateRow.link,
+      postType: planRow.type,
+      sourceUrl: planRow.title,
       imageUrl: '',
       channelPosted: channel,
       status: 'error',
