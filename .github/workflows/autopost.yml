@@ -13,6 +13,7 @@ on:
         options:
           - post
           - init-sheets
+          - scan-cases
 
 jobs:
   init-sheets:
@@ -26,6 +27,21 @@ jobs:
       - run: npm ci
       - run: npm run init-sheets
         env:
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+
+  scan-cases:
+    if: github.event.inputs.job == 'scan-cases'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm run scan-cases
+        env:
+          LEADGET_ADMIN_TOKEN: ${{ secrets.LEADGET_ADMIN_TOKEN }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
 
