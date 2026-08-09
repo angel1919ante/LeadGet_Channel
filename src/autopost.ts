@@ -104,6 +104,23 @@ async function main(): Promise<void> {
     ensureCasesSheet(),
   ]);
 
+  // TEST_CASE_TOKEN: прямой тест кейса без ContentPlan
+  const testToken = process.env.TEST_CASE_TOKEN;
+  if (testToken) {
+    console.log(`TEST MODE: case token=${testToken}`);
+    const fakeRow: ContentPlanRow = {
+      rowNumber: -1, date: '', type: 'кейс',
+      title: process.env.TEST_CASE_TITLE ?? 'Тест',
+      token: testToken,
+      data: process.env.TEST_CASE_DATA ?? '{}',
+      status: 'approved', post: '',
+    };
+    const rawPost = await generateCasePost(fakeRow);
+    const formatted = await formatPost(rawPost);
+    await postAndRecord('кейс', formatted, `leadget:${testToken}`);
+    return;
+  }
+
   const today = todayDMY();
   console.log(`autopost: today=${today}`);
 
