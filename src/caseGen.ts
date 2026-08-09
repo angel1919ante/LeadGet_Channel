@@ -43,12 +43,13 @@ function pct(part: number, total: number): string {
 }
 
 function buildResultsString(s: CampaignSummary, price?: string): string {
+  const convPct = s.sent ? ((s.leads / s.sent) * 100).toFixed(1) : '0';
   const lines = [
-    `Отправлено: \`${s.sent}\``,
+    `Рассылка: \`${s.sent}\` сообщений отправлено`,
     `Прочитали: \`${s.read}\` (${pct(s.read, s.sent)})`,
     `Ответили: \`${s.replied}\` (${pct(s.replied, s.sent)})`,
-    `Диалогов: \`${s.engaged}\` (${pct(s.engaged, s.sent)})`,
-    `Квал. лидов: \`${s.leads}\` (${pct(s.leads, s.sent)})`,
+    `Квал. диалогов: \`${s.engaged}\` (${pct(s.engaged, s.sent)})`,
+    `Конверсия в лид: \`${convPct}%\` — \`${s.leads}\` квал. лидов`,
   ];
   if (s.disqualified) lines.push(`Дисквалифицировано: \`${s.disqualified}\``);
   if (price) lines.push(`Цена квал. лида: \`${price} ₽\``);

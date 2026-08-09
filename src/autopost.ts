@@ -48,7 +48,14 @@ async function postAndRecord(
   console.log(`posted [${postType}]: ${sourceRef.slice(0, 60)}`);
 }
 
-async function handleNews(planRow: ContentPlanRow): Promise<string> {
+interface NewsResult {
+  rawPost: string;
+  link: string;
+  title: string;
+  summary: string;
+}
+
+async function handleNews(planRow: ContentPlanRow): Promise<NewsResult> {
   const news = await getAllRows();
   const alreadyPosted = new Set(
     (await import('./sheets.ts').then((m) => m.getAutoPostRows()))
@@ -69,7 +76,8 @@ async function handleNews(planRow: ContentPlanRow): Promise<string> {
     rating: candidate.rating,
     description: candidate.summary,
   };
-  return callLLM(postPrompt(c));
+  const rawPost = await callLLM(postPrompt(c));
+  return { rawPost, link: candidate.link, title: candidate.title, summary: candidate.summary };
 }
 
 async function handleFeature(planRow: ContentPlanRow): Promise<string> {
@@ -114,8 +122,15 @@ async function main(): Promise<void> {
 
   try {
     if (planRow.type === 'новость') {
-      rawPost = await handleNews(planRow);
-      sourceRef = 'news-auto';
+      const news = await handleNews(planRow);
+      // Записываем в план выбранную новость — чтобы было видно саммари и ссылку
+      await updateContentPlanRow(planRow.rowNumber, {
+        title: news.title,
+        data: JSON.stringify({ link: news.link, summary: news.summary }),
+      });
+      // Ссылка на источник всегда в конце поста
+      rawPost = `${news.rawPost}\n\nИсточник: ${news.link}`;
+      sourceRef = news.link;
     } else if (planRow.type === 'кейс') {
       if (!planRow.token) throw new Error('для кейса нужен Токен в ContentPlan');
       rawPost = await generateCasePost(planRow);

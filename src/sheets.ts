@@ -611,16 +611,18 @@ export async function getContentPlanRows(): Promise<ContentPlanRow[]> {
 
 export async function updateContentPlanRow(
   rowNumber: number,
-  patch: { status?: string; post?: string },
+  patch: { title?: string; data?: string; status?: string; post?: string },
 ): Promise<void> {
   const sheets = getClient();
-  const data: sheets_v4.Schema$ValueRange[] = [];
-  if (patch.status !== undefined) data.push({ range: `${CP_SHEET}!F${rowNumber}`, values: [[patch.status]] });
-  if (patch.post !== undefined) data.push({ range: `${CP_SHEET}!G${rowNumber}`, values: [[patch.post]] });
-  if (data.length === 0) return;
+  const ranges: sheets_v4.Schema$ValueRange[] = [];
+  if (patch.title !== undefined) ranges.push({ range: `${CP_SHEET}!C${rowNumber}`, values: [[patch.title]] });
+  if (patch.data !== undefined) ranges.push({ range: `${CP_SHEET}!E${rowNumber}`, values: [[patch.data]] });
+  if (patch.status !== undefined) ranges.push({ range: `${CP_SHEET}!F${rowNumber}`, values: [[patch.status]] });
+  if (patch.post !== undefined) ranges.push({ range: `${CP_SHEET}!G${rowNumber}`, values: [[patch.post]] });
+  if (ranges.length === 0) return;
   await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId: getSheetId(),
-    requestBody: { valueInputOption: 'RAW', data },
+    requestBody: { valueInputOption: 'RAW', data: ranges },
   });
 }
 
