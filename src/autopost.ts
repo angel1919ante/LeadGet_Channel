@@ -3,7 +3,7 @@ import { callLLM } from './llm.ts';
 import { postPrompt } from './prompts.ts';
 import { generateImageConcept, generateImage } from './imageGen.ts';
 import { formatPost } from './formatter.ts';
-import { sendPhotoAsUser, disconnectMTProto } from './mtproto.ts';
+import { postAsUser, sendPhotoAsUser, disconnectMTProto } from './mtproto.ts';
 import type { Candidate, Source } from './types.ts';
 
 // Этап 1: только новостные посты, только тестовый канал.
@@ -38,13 +38,20 @@ async function main(): Promise<void> {
     description: candidateRow.summary,
   };
 
+  const skipImage = process.env.SKIP_IMAGE === 'true';
+
   try {
     const rawPost = await callLLM(postPrompt(candidate));
     const formatted = await formatPost(rawPost);
-    const concept = await generateImageConcept(rawPost, POST_TYPE);
-    const imageUrl = await generateImage(concept, POST_TYPE);
 
-    await sendPhotoAsUser(channel, imageUrl, formatted);
+    let imageUrl = '';
+    if (skipImage) {
+      await postAsUser(channel, formatted);
+    } else {
+      const concept = await generateImageConcept(rawPost, POST_TYPE);
+      imageUrl = await generateImage(concept, POST_TYPE);
+      await sendPhotoAsUser(channel, imageUrl, formatted);
+    }
 
     await appendAutoPost({
       postType: POST_TYPE,
