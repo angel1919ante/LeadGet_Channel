@@ -1,12 +1,15 @@
 import type { Candidate } from './types.ts';
 
-export function relevancePrompt(c: Candidate): string {
+export function relevancePrompt(c: Candidate, postedExamples?: Array<{ title: string; source: string }>): string {
+  const examplesBlock = postedExamples?.length
+    ? `\nПРИМЕРЫ УЖЕ ОПУБЛИКОВАННЫХ ХОРОШИХ НОВОСТЕЙ (оценивай похожие высоко):\n${postedExamples.map((e) => `- [${e.source}] ${e.title}`).join('\n')}\n`
+    : '';
   return `Оцени релевантность этой новости для Telegram-канала LeadGet. Тематика канала: лидогенерация через Telegram, B2B-маркетинг, рекламные платформы (Яндекс, VK, Google, Meta, Telegram Ads), инструменты для продаж и конверсии.
 
 Высокая оценка (8–10): конкретное обновление рекламной платформы с цифрами, новый инструмент для лидогенерации/атрибуции, исследование рынка с данными, Telegram-маркетинг.
 Средняя (5–7): общие маркетинговые тренды с данными, смежные темы (e-commerce, retention).
 Низкая (1–4): корпоративные новости без данных, SEO-теория, ивент-анонсы, колонки мнений, HR, дизайн.
-
+${examplesBlock}
 Источник: ${c.source}
 Заголовок: ${c.title}
 Описание: ${c.description?.slice(0, 500) ?? ''}

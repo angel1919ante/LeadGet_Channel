@@ -8,6 +8,10 @@ async function main(): Promise<void> {
 
   const existing = await getAllRows();
   const seenLinks = new Set(existing.map((r) => r.link));
+  const postedExamples = existing
+    .filter((r) => r.status === 'posted')
+    .map((r) => ({ title: r.title, source: r.source }))
+    .slice(-30); // последние 30 опубликованных
 
   const candidates = await fetchAll();
   const fresh = candidates.filter((c) => !seenLinks.has(c.link));
@@ -27,7 +31,7 @@ async function main(): Promise<void> {
     // LLM-фильтр: пропускаем нерелевантные новости до генерации саммари
     let relevance = 0;
     try {
-      const raw = await callLLM(relevancePrompt(c));
+      const raw = await callLLM(relevancePrompt(c, postedExamples));
       relevance = parseInt(raw.trim(), 10) || 0;
     } catch (e) {
       console.error(`relevance failed for ${c.link}:`, e);
