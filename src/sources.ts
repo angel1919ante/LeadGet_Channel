@@ -1,5 +1,6 @@
 import Parser from 'rss-parser';
 import type { Candidate } from './types.ts';
+import { fetchTelegramChannel, disconnectMTProto } from './mtproto.ts';
 
 const parser = new Parser();
 
@@ -126,11 +127,46 @@ export async function fetchReddit(): Promise<Candidate[]> {
   }
 }
 
+// Telegram-каналы: username без @ или invite-хэш для приватных
+const TG_CHANNELS: Array<{ id: string; source: string }> = [
+  { id: 'molyanov_blog', source: 'tg:molyanov_blog' },
+  { id: 'Leadget_channel', source: 'tg:leadget_channel' },
+  { id: '+RTqYchZh5C81OTJi', source: 'tg:private_channel' },
+];
+
+export async function fetchTelegramChannels(): Promise<Candidate[]> {
+  // Пропускаем если MTProto-переменные не заданы (например в тестах)
+  if (!process.env.TELEGRAM_SESSION) return [];
+
+  const out: Candidate[] = [];
+  for (const ch of TG_CHANNELS) {
+    try {
+      const messages = await fetchTelegramChannel(ch.id, 30);
+      for (const msg of messages) {
+        const link = `https://t.me/${ch.id.startsWith('+') ? 'c/' + ch.id.slice(1) : ch.id}/${msg.id}`;
+        const firstLine = msg.text.split('\n')[0].slice(0, 120);
+        out.push({
+          source: ch.source,
+          title: firstLine,
+          link,
+          rating: 0,
+          description: msg.text.slice(0, 600),
+        });
+      }
+    } catch (e) {
+      console.error(`tg channel ${ch.id} fetch failed:`, e);
+    }
+  }
+  await disconnectMTProto();
+  return out;
+}
+
 export async function fetchAll(): Promise<Candidate[]> {
-  const [habr, cossa, reddit] = await Promise.all([
+  const [habr, cossa, reddit, tg] = await Promise.all([
     fetchHabr(),
     fetchCossa(),
     fetchReddit(),
+    fetchTelegramChannels(),
   ]);
-  return [...habr, ...cossa, ...reddit];
+  return [...habr, ...cossa, ...reddit, ...tg];
 }

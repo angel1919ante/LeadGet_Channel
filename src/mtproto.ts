@@ -40,6 +40,18 @@ export async function sendPhotoAsUser(channelId: string, photoUrl: string, capti
   });
 }
 
+// Читает последние N сообщений из канала. username — без @.
+export async function fetchTelegramChannel(
+  username: string,
+  limit = 30,
+): Promise<Array<{ id: number; text: string; date: number }>> {
+  const client = await getClient();
+  const messages = await client.getMessages(username, { limit });
+  return messages
+    .filter((m) => m.text && m.text.length > 50)
+    .map((m) => ({ id: m.id, text: m.text, date: m.date }));
+}
+
 export async function disconnectMTProto(): Promise<void> {
   if (_client) {
     await _client.disconnect();
