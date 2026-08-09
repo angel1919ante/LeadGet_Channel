@@ -66,12 +66,27 @@ export async function fetchHabr(): Promise<Candidate[]> {
   return out;
 }
 
+// Ключевые слова для фильтрации Cossa — хотя бы одно должно совпасть
+const COSSA_KEYWORDS = [
+  'яндекс', 'директ', 'vk реклам', 'вк реклам', 'telegram ads', 'телеграм ads',
+  'google ads', 'meta ads', 'таргет', 'лидоген', 'лид', 'конверс',
+  'коллтрекинг', 'crm', 'roi', 'roas', 'сквозная аналитик',
+  'рекламный кабинет', 'реклам', 'перформанс', 'performance',
+  'ии', 'искусственный интеллект', 'нейросет', 'автоматизац',
+  'telegram', 'телеграм', 'мессенджер', 'chatbot', 'чат-бот',
+  'воронк', 'продаж', 'cpa', 'cpc', 'cpm',
+];
+
 // Cossa.ru — главный российский сайт про digital-маркетинг и рекламу
 export async function fetchCossa(): Promise<Candidate[]> {
   try {
     const feed = await parser.parseURL('https://www.cossa.ru/rss/');
     return feed.items
-      .filter((item) => !!item.link)
+      .filter((item) => {
+        if (!item.link) return false;
+        const text = `${item.title ?? ''} ${item.contentSnippet ?? ''}`.toLowerCase();
+        return COSSA_KEYWORDS.some((kw) => text.includes(kw));
+      })
       .slice(0, 20)
       .map((item) => ({
         source: 'cossa' as const,
@@ -86,21 +101,24 @@ export async function fetchCossa(): Promise<Candidate[]> {
   }
 }
 
-// Reddit r/marketing — международный маркетинг, тренды, инструменты
+// Reddit r/marketing — JSON API даёт score постов, RSS не даёт
 export async function fetchReddit(): Promise<Candidate[]> {
   try {
-    const feed = await parser.parseURL(
-      'https://www.reddit.com/r/marketing/top.rss?t=day&limit=25',
+    const res = await fetch(
+      'https://www.reddit.com/r/marketing/top.json?t=day&limit=50',
+      { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LeadGetBot/1.0)' } },
     );
-    return feed.items
-      .filter((item) => !!item.link)
+    if (!res.ok) return [];
+    const json = await res.json() as { data: { children: Array<{ data: { score: number; title: string; url: string; selftext: string; permalink: string } }> } };
+    return json.data.children
+      .filter((c) => c.data.score >= 50)
       .slice(0, 15)
-      .map((item) => ({
+      .map((c) => ({
         source: 'reddit' as const,
-        title: item.title ?? '(без заголовка)',
-        link: item.link!,
-        rating: 0,
-        description: item.contentSnippet?.slice(0, 500) ?? item.content?.slice(0, 500) ?? '',
+        title: c.data.title,
+        link: `https://www.reddit.com${c.data.permalink}`,
+        rating: c.data.score,
+        description: c.data.selftext.slice(0, 500),
       }));
   } catch (e) {
     console.error('reddit fetch failed:', e);

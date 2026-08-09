@@ -1,7 +1,7 @@
 import { fetchAll } from './sources.ts';
 import { ensureHeader, getAllRows, appendPending } from './sheets.ts';
 import { callLLM } from './llm.ts';
-import { summaryPrompt } from './prompts.ts';
+import { summaryPrompt, relevancePrompt } from './prompts.ts';
 
 async function main(): Promise<void> {
   await ensureHeader();
@@ -21,7 +21,22 @@ async function main(): Promise<void> {
     rating: number;
   }> = [];
 
+  const MIN_RELEVANCE = 7;
+
   for (const c of fresh) {
+    // LLM-фильтр: пропускаем нерелевантные новости до генерации саммари
+    let relevance = 0;
+    try {
+      const raw = await callLLM(relevancePrompt(c));
+      relevance = parseInt(raw.trim(), 10) || 0;
+    } catch (e) {
+      console.error(`relevance failed for ${c.link}:`, e);
+    }
+    if (relevance < MIN_RELEVANCE) {
+      console.log(`skip (relevance=${relevance}): ${c.title.slice(0, 60)}`);
+      continue;
+    }
+
     let summary = '';
     try {
       summary = await callLLM(summaryPrompt(c));
@@ -34,7 +49,7 @@ async function main(): Promise<void> {
       title: c.title,
       summary,
       link: c.link,
-      rating: c.rating,
+      rating: relevance * 10, // нормируем в рейтинг 0–100
     });
   }
 
