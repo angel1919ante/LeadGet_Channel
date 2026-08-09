@@ -1,6 +1,7 @@
 import {
   ensureHeader,
   getAllRows,
+  updateRow,
   ensureAutoPostsSheet,
   appendAutoPost,
   ensureContentPlanSheet,
@@ -54,6 +55,7 @@ interface NewsResult {
   link: string;
   title: string;
   summary: string;
+  rowNumber: number;
 }
 
 async function handleNews(planRow: ContentPlanRow): Promise<NewsResult> {
@@ -79,7 +81,7 @@ async function handleNews(planRow: ContentPlanRow): Promise<NewsResult> {
   };
   const tone = await loadToneSamples().catch(() => ({ ours: [], learn: [] }));
   const rawPost = await callLLM(postPrompt(c, tone));
-  return { rawPost, link: candidate.link, title: candidate.title, summary: candidate.summary };
+  return { rawPost, link: candidate.link, title: candidate.title, summary: candidate.summary, rowNumber: candidate.rowNumber };
 }
 
 async function handleFeature(planRow: ContentPlanRow): Promise<string> {
@@ -138,6 +140,7 @@ async function main(): Promise<void> {
 
   let rawPost: string;
   let sourceRef: string;
+  let newsRowNumber: number | undefined;
 
   try {
     if (planRow.type === 'новость') {
@@ -150,6 +153,7 @@ async function main(): Promise<void> {
       // Ссылка на источник всегда в конце поста
       rawPost = `${news.rawPost}\n\nИсточник: ${news.link}`;
       sourceRef = news.link;
+      newsRowNumber = news.rowNumber;
     } else if (planRow.type === 'кейс') {
       if (!planRow.token) throw new Error('для кейса нужен Токен в ContentPlan');
       rawPost = await generateCasePost(planRow);
@@ -164,6 +168,9 @@ async function main(): Promise<void> {
     const formatted = await formatPost(rawPost);
     await postAndRecord(planRow.type, formatted, sourceRef);
     await updateContentPlanRow(planRow.rowNumber, { status: 'posted', post: formatted });
+    if (newsRowNumber !== undefined) {
+      await updateRow(newsRowNumber, { status: 'posted' });
+    }
   } catch (e) {
     console.error('autopost failed:', e);
     await updateContentPlanRow(planRow.rowNumber, { status: 'error' });
