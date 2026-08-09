@@ -20,6 +20,9 @@ async function main(): Promise<void> {
   const posted = await getAutoPostRows();
   const alreadyPosted = new Set(posted.map((r) => r.sourceUrl));
 
+  console.log(`total rows: ${news.length}, already posted: ${alreadyPosted.size}`);
+  console.log('statuses:', [...new Set(news.map((r) => `"${r.status}"`))].join(', '));
+
   // Берём лучшую одобренную новость, которую ещё не автопостили.
   const candidateRow = [...news]
     .filter((r) => r.status === 'approved' && !alreadyPosted.has(r.link))
