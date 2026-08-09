@@ -1,4 +1,5 @@
 import type { Candidate } from './types.ts';
+import type { ToneSamples } from './toneSamples.ts';
 
 export function relevancePrompt(c: Candidate, postedExamples?: Array<{ title: string; source: string }>): string {
   const examplesBlock = postedExamples?.length
@@ -103,8 +104,21 @@ ${COMMON_BANS}
 
 Выведи ТОЛЬКО итоговый текст поста. Без комментариев, без пояснений, без «вот пост:».`;
 
-export function postPrompt(c: Candidate): string {
-  return `${NEWS_TZ}
+function toneBlock(samples: ToneSamples | undefined): string {
+  if (!samples || (!samples.ours.length && !samples.learn.length)) return '';
+  const parts: string[] = ['\n---\nПРИМЕРЫ СТИЛЯ (учитывай при написании):'];
+  if (samples.ours.length) {
+    parts.push(`\nНАШ КАНАЛ — основной тон (держи 70% голоса отсюда):\n${samples.ours.map((t, i) => `[${i + 1}]\n${t}`).join('\n\n')}`);
+  }
+  if (samples.learn.length) {
+    parts.push(`\nОБУЧАЮЩИЕ КАНАЛЫ — адаптируй приёмы, не копируй (30% влияния):\n${samples.learn.map((t, i) => `[${i + 1}]\n${t}`).join('\n\n')}`);
+  }
+  parts.push('---');
+  return parts.join('\n');
+}
+
+export function postPrompt(c: Candidate, tone?: ToneSamples): string {
+  return `${NEWS_TZ}${toneBlock(tone)}
 
 ИСХОДНАЯ НОВОСТЬ:
 Источник: ${c.source}

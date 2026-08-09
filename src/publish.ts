@@ -2,12 +2,17 @@ import { getAllRows, updateRow } from './sheets.ts';
 import { callLLM } from './llm.ts';
 import { postPrompt } from './prompts.ts';
 import { postToChannel } from './telegram.ts';
+import { loadToneSamples } from './toneSamples.ts';
 import type { Candidate, Source } from './types.ts';
 
 async function main(): Promise<void> {
   const rows = await getAllRows();
   const approved = rows.filter((r) => r.status === 'approved');
   console.log(`approved rows to publish: ${approved.length}`);
+  if (!approved.length) return;
+
+  const tone = await loadToneSamples().catch(() => ({ ours: [], learn: [] }));
+  console.log(`tone samples: ours=${tone.ours.length} learn=${tone.learn.length}`);
 
   for (const r of approved) {
     const candidate: Candidate = {
@@ -20,7 +25,7 @@ async function main(): Promise<void> {
 
     let post = r.post;
     try {
-      if (!post) post = await callLLM(postPrompt(candidate));
+      if (!post) post = await callLLM(postPrompt(candidate, tone));
       await postToChannel(post);
       await updateRow(r.rowNumber, { post, status: 'posted' });
       console.log(`posted row ${r.rowNumber}: ${r.title.slice(0, 60)}`);
