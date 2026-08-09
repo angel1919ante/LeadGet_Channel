@@ -55,6 +55,9 @@ export async function formatPost(raw: string): Promise<string> {
   // Первая строка (заголовок) → <b>
   text = text.replace(/^(.+)$/m, '<b>$1</b>');
 
+  // Пустая строка перед каждым буллетом кроме первого
+  text = text.replace(/\n(•)/g, '\n\n$1');
+
   // Анимированные эмодзи
   text = animateEmoji(text);
 
