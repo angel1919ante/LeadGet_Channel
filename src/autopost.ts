@@ -18,7 +18,7 @@ async function main(): Promise<void> {
 
   const news = await getAllRows();
   const posted = await getAutoPostRows();
-  const alreadyPosted = new Set(posted.map((r) => r.sourceUrl));
+  const alreadyPosted = new Set(posted.filter((r) => r.status === 'success').map((r) => r.sourceUrl));
 
   console.log(`total rows: ${news.length}, already posted: ${alreadyPosted.size}`);
   console.log('statuses:', [...new Set(news.map((r) => `"${r.status}"`))].join(', '));
