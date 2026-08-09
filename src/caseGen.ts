@@ -71,15 +71,14 @@ function buildResultsString(s: CampaignSummary, token: string, price?: string): 
 
   console.log(`scale: real ${s.sent}→${sent}, leads ${s.leads}→${leads} (${convPct}%)`);
 
-  const lines = [
+  const inner = [
     `Рассылка: \`${sent}\` сообщений отправлено`,
-    `Прочитали: \`${read}\` (${pct(read, sent)})`,
-    `Ответили: \`${replied}\` (${pct(replied, sent)})`,
+    `Прочитали: \`${read}\` (${pct(read, sent)}) Ответили: \`${replied}\` (${pct(replied, sent)})`,
     `Квал. диалогов: \`${engaged}\` (${pct(engaged, sent)})`,
-    `Конверсия в лид: \`${convPct}%\` — \`${leads}\` квал. лидов`,
-  ];
-  if (price) lines.push(`Цена квал. лида: \`${price} ₽\``);
-  return lines.join('\n');
+    `Конверсия в лид: \`${convPct}%\` — \`${leads}\` квалифицированных лидов`,
+    ...(price ? [`\`${price} ₽\` цена квал. лида`] : []),
+  ].join('\n');
+  return `[QUOTE]${inner}[/QUOTE]`;
 }
 
 export async function generateCasePost(row: ContentPlanRow): Promise<string> {
