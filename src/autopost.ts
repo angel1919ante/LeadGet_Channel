@@ -3,7 +3,7 @@ import { callLLM } from './llm.ts';
 import { postPrompt } from './prompts.ts';
 import { generateImageConcept, generateImage } from './imageGen.ts';
 import { formatPost } from './formatter.ts';
-import { sendPhotoToChannel } from './telegram.ts';
+import { sendPhotoAsUser, disconnectMTProto } from './mtproto.ts';
 import type { Candidate, Source } from './types.ts';
 
 // Этап 1: только новостные посты, только тестовый канал.
@@ -44,7 +44,7 @@ async function main(): Promise<void> {
     const concept = await generateImageConcept(rawPost, POST_TYPE);
     const imageUrl = await generateImage(concept, POST_TYPE);
 
-    await sendPhotoToChannel(channel, imageUrl, formatted);
+    await sendPhotoAsUser(channel, imageUrl, formatted);
 
     await appendAutoPost({
       postType: POST_TYPE,
@@ -67,7 +67,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => disconnectMTProto());
