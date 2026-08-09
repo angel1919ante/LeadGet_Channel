@@ -1,17 +1,22 @@
 import { fetchAll } from './sources.ts';
-import { ensureHeader, getAllRows, appendPending } from './sheets.ts';
+import { ensureHeader, getAllRows, appendPending, readPreferences } from './sheets.ts';
 import { callLLM } from './llm.ts';
 import { summaryPrompt, relevancePrompt } from './prompts.ts';
 
 async function main(): Promise<void> {
   await ensureHeader();
 
-  const existing = await getAllRows();
+  const [existing, prefs] = await Promise.all([getAllRows(), readPreferences().catch(() => ({ globalThreshold: 7, sources: [] }))]);
   const seenLinks = new Set(existing.map((r) => r.link));
   const postedExamples = existing
     .filter((r) => r.status === 'posted')
     .map((r) => ({ title: r.title, source: r.source }))
-    .slice(-30); // последние 30 опубликованных
+    .slice(-30);
+
+  // Справочник доверия по источнику
+  const trustMap = new Map(prefs.sources.map((s) => [s.source, s.trust]));
+  const baseThreshold = prefs.globalThreshold || 7;
+  console.log(`prefs: threshold=${baseThreshold}, sources=${prefs.sources.length}`);
 
   const candidates = await fetchAll();
   const fresh = candidates.filter((c) => !seenLinks.has(c.link));
@@ -25,10 +30,13 @@ async function main(): Promise<void> {
     rating: number;
   }> = [];
 
-  const MIN_RELEVANCE = 7;
-
   for (const c of fresh) {
-    // LLM-фильтр: пропускаем нерелевантные новости до генерации саммари
+    // High-trust источники проходят по сниженному порогу, low-trust — по повышенному
+    const trust = trustMap.get(c.source) ?? 'normal';
+    const threshold = trust === 'high' ? Math.max(5, baseThreshold - 1.5)
+                    : trust === 'low'  ? Math.min(9, baseThreshold + 1)
+                    : baseThreshold;
+
     let relevance = 0;
     try {
       const raw = await callLLM(relevancePrompt(c, postedExamples));
@@ -36,8 +44,8 @@ async function main(): Promise<void> {
     } catch (e) {
       console.error(`relevance failed for ${c.link}:`, e);
     }
-    if (relevance < MIN_RELEVANCE) {
-      console.log(`skip (relevance=${relevance}): ${c.title.slice(0, 60)}`);
+    if (relevance < threshold) {
+      console.log(`skip (relevance=${relevance}, threshold=${threshold}, trust=${trust}): ${c.title.slice(0, 60)}`);
       continue;
     }
 

@@ -762,6 +762,80 @@ export async function updateCaseStatus(rowNumber: number, status: string): Promi
   });
 }
 
+// ── Лист Preferences ───────────────────────────────────────────
+
+const PREF_SHEET = 'Preferences';
+const PREF_HEADER = ['Обновлено', 'Источник', 'Всего', 'Одобрено', 'Отклонено', 'Рейтинг одобр.', 'Рейтинг откл.', 'Доверие', 'Порог (глоб.)'];
+const PREF_COL_WIDTHS = [120, 160, 70, 80, 80, 110, 110, 90, 110];
+
+export interface PreferenceRow {
+  source: string;
+  total: number;
+  approved: number;
+  rejected: number;
+  avgRatingApproved: number;
+  avgRatingRejected: number;
+  trust: string;
+  globalThreshold: number;
+}
+
+export async function ensurePreferencesSheet(): Promise<void> {
+  const sheets = getClient();
+  const spreadsheetId = getSheetId();
+  await ensureSheetExists(sheets, spreadsheetId, PREF_SHEET, PREF_HEADER, PREF_COL_WIDTHS);
+}
+
+export async function writePreferences(rows: PreferenceRow[], globalThreshold: number): Promise<void> {
+  const sheets = getClient();
+  const spreadsheetId = getSheetId();
+  const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
+
+  // Очищаем старые данные (кроме заголовка)
+  await sheets.spreadsheets.values.clear({ spreadsheetId, range: `${PREF_SHEET}!A2:I` });
+
+  if (rows.length === 0) return;
+
+  const values = rows.map((r, i) => [
+    i === 0 ? now : '',
+    r.source,
+    String(r.total),
+    String(r.approved),
+    String(r.rejected),
+    r.avgRatingApproved > 0 ? r.avgRatingApproved.toFixed(1) : '',
+    r.avgRatingRejected > 0 ? r.avgRatingRejected.toFixed(1) : '',
+    r.trust,
+    i === 0 ? String(globalThreshold) : '',
+  ]);
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${PREF_SHEET}!A2`,
+    valueInputOption: 'RAW',
+    requestBody: { values },
+  });
+}
+
+export async function readPreferences(): Promise<{ globalThreshold: number; sources: PreferenceRow[] }> {
+  const sheets = getClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: getSheetId(),
+    range: `${PREF_SHEET}!A2:I`,
+  });
+  const rows = res.data.values ?? [];
+  const globalThreshold = rows[0] ? parseInt(rows[0][8] ?? '70', 10) : 70;
+  const sources = rows.map((r) => ({
+    source: r[1] ?? '',
+    total: parseInt(r[2] ?? '0', 10),
+    approved: parseInt(r[3] ?? '0', 10),
+    rejected: parseInt(r[4] ?? '0', 10),
+    avgRatingApproved: parseFloat(r[5] ?? '0'),
+    avgRatingRejected: parseFloat(r[6] ?? '0'),
+    trust: r[7] ?? 'normal',
+    globalThreshold,
+  })).filter((r) => r.source);
+  return { globalThreshold, sources };
+}
+
 export async function appendContentPlanRow(row: {
   date: string;   // DD.MM.YYYY
   type: string;   // новость | кейс | фича

@@ -9,7 +9,8 @@
     "generate:articles": "tsx src/articles.ts",
     "autopost": "tsx src/autopost.ts",
     "init-sheets": "tsx src/initSheets.ts",
-    "scan-cases": "tsx src/caseScanner.ts"
+    "scan-cases": "tsx src/caseScanner.ts",
+    "learn": "tsx src/learn.ts"
   },
   "dependencies": {
     "googleapis": "^144.0.0",
