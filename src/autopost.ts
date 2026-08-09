@@ -16,6 +16,7 @@ import { generateImageConcept, generateImage } from './imageGen.ts';
 import { formatPost } from './formatter.ts';
 import { postAsUser, sendPhotoAsUser, disconnectMTProto } from './mtproto.ts';
 import { generateCasePost } from './caseGen.ts';
+import { loadToneSamples } from './toneSamples.ts';
 import type { Candidate, Source } from './types.ts';
 
 const channel = process.env.POST_CHANNEL;
@@ -76,7 +77,8 @@ async function handleNews(planRow: ContentPlanRow): Promise<NewsResult> {
     rating: candidate.rating,
     description: candidate.summary,
   };
-  const rawPost = await callLLM(postPrompt(c));
+  const tone = await loadToneSamples().catch(() => ({ ours: [], learn: [] }));
+  const rawPost = await callLLM(postPrompt(c, tone));
   return { rawPost, link: candidate.link, title: candidate.title, summary: candidate.summary };
 }
 

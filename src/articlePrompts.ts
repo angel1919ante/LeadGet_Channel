@@ -1,5 +1,6 @@
 import type { Candidate } from './types.ts';
 import type { Platform } from './articleTypes.ts';
+import type { Prompt } from './llm.ts';
 
 const COMMON_RULES = `
 ТЕМА: лидогенерация, Telegram-маркетинг, автоматизация продаж, рынок рекламы для российского бизнеса.
@@ -96,18 +97,19 @@ const PLATFORM_RULES: Record<Platform, string> = {
 // X — тред, не индексируется поисковиками, SEO-блок не нужен
 const SEO_PLATFORMS: Platform[] = ['habr', 'vc', 'dzen'];
 
-export function articlePrompt(c: Candidate, platform: Platform): string {
+// cached: правила площадки — одинаковы для каждой новости с этой же площадкой в одном прогоне.
+export function articlePrompt(c: Candidate, platform: Platform): Prompt {
   const seoBlock = SEO_PLATFORMS.includes(platform) ? SEO_RULES : '';
-  return `Ты редактор и автор контента платформы LeadGet.
+  const cached = `Ты редактор и автор контента платформы LeadGet.
 ${COMMON_RULES}
 ${PLATFORM_RULES[platform]}
-${seoBlock}
-
-ИСХОДНАЯ НОВОСТЬ:
+${seoBlock}`;
+  const dynamic = `ИСХОДНАЯ НОВОСТЬ:
 Заголовок: ${c.title}
 Источник: ${c.source}
 Ссылка: ${c.link}
 Содержание: ${c.description?.slice(0, 3000) ?? ''}
 
 Выведи ТОЛЬКО итоговый результат по указанному формату. Без комментариев и пояснений.`;
+  return { cached, dynamic };
 }
