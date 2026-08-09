@@ -1,11 +1,6 @@
 name: LeadGet Channel Bot
 
 on:
-  schedule:
-    # 08:00 МСК (05:00 UTC) — сбор кандидатов
-    - cron: '0 5 * * *'
-    # 18:00 МСК (15:00 UTC) — публикация одобренных
-    - cron: '0 15 * * *'
   workflow_dispatch:
     inputs:
       job:
