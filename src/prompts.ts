@@ -202,12 +202,13 @@ ${COMMON_BANS}
 
 Выведи ТОЛЬКО итоговый текст поста. Без комментариев, без пояснений.`;
 
-export function casePostPrompt(niche: string, task: string, mechanics: string, results: string): string {
+export function casePostPrompt(niche: string, task: string, mechanics: string): string {
   return `${CASE_TZ}
 
 ДАННЫЕ КЕЙСА:
 Ниша: ${niche}
 Задача: ${task}
 Механика: ${mechanics}
-Результаты: ${results}`;
+
+ВАЖНО: В блоке "↗️ Итоги" оставь строго метку <<RESULTS>> — ничего больше. Эта метка будет заменена готовым блоком цифр автоматически.`;
 }
