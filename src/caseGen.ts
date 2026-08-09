@@ -32,9 +32,9 @@ async function fetchCampaignSummary(token: string): Promise<CampaignSummary> {
     headers: { 'User-Agent': 'LeadGetBot/1.0' },
   });
   if (!res.ok) throw new Error(`campaign summary fetch failed: ${res.status}`);
-  const json = await res.json() as CampaignSummary & { data?: CampaignSummary };
-  // API может вернуть данные напрямую или в поле data
-  return json.data ?? json;
+  const json = await res.json() as { funnel?: CampaignSummary; data?: CampaignSummary } & CampaignSummary;
+  // API возвращает {funnel: {...}} или flat или {data: {...}}
+  return json.funnel ?? json.data ?? json;
 }
 
 function pct(part: number, total: number): string {

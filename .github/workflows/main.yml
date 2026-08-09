@@ -1,6 +1,8 @@
 name: LeadGet Channel Bot
 
 on:
+  schedule:
+    - cron: '0 7 * * *'  # 10:00 МСК — сбор новостей + скан кейсов
   workflow_dispatch:
     inputs:
       job:
@@ -14,7 +16,7 @@ on:
 
 jobs:
   collect:
-    if: github.event.schedule == '0 5 * * *' || github.event.inputs.job == 'collect'
+    if: github.event_name == 'schedule' || github.event.inputs.job == 'collect'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +28,11 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+      - run: npm run scan-cases
+        env:
+          LEADGET_ADMIN_TOKEN: ${{ secrets.LEADGET_ADMIN_TOKEN }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
 

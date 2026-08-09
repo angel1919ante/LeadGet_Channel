@@ -691,6 +691,7 @@ export async function ensureCasesSheet(): Promise<void> {
             values: [
               { userEnteredValue: 'pending' },
               { userEnteredValue: 'approved' },
+              { userEnteredValue: 'add to plan' },
               { userEnteredValue: 'posted' },
               { userEnteredValue: 'skip' },
             ],
@@ -747,6 +748,34 @@ export async function appendCaseCandidate(row: {
         row.conversion.toFixed(1),
         'pending',
       ]],
+    },
+  });
+}
+
+export async function updateCaseStatus(rowNumber: number, status: string): Promise<void> {
+  const sheets = getClient();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: getSheetId(),
+    range: `${CASES_SHEET}!H${rowNumber}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[status]] },
+  });
+}
+
+export async function appendContentPlanRow(row: {
+  date: string;   // DD.MM.YYYY
+  type: string;   // новость | кейс | фича
+  title: string;
+  token: string;
+  data: string;
+}): Promise<void> {
+  const sheets = getClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: getSheetId(),
+    range: `${CP_SHEET}!A:G`,
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: [[row.date, row.type, row.title, row.token, row.data, 'approved', '']],
     },
   });
 }
