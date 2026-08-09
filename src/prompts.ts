@@ -1,21 +1,25 @@
 import type { Candidate } from './types.ts';
 import type { ToneSamples } from './toneSamples.ts';
+import type { Prompt } from './llm.ts';
 
-export function relevancePrompt(c: Candidate, postedExamples?: Array<{ title: string; source: string }>): string {
+// cached: правила + примеры — одинаковы для каждого кандидата в одном прогоне collect.
+// dynamic: конкретная новость — меняется каждый вызов.
+export function relevancePrompt(c: Candidate, postedExamples?: Array<{ title: string; source: string }>): Prompt {
   const examplesBlock = postedExamples?.length
     ? `\nПРИМЕРЫ УЖЕ ОПУБЛИКОВАННЫХ ХОРОШИХ НОВОСТЕЙ (оценивай похожие высоко):\n${postedExamples.map((e) => `- [${e.source}] ${e.title}`).join('\n')}\n`
     : '';
-  return `Оцени релевантность этой новости для Telegram-канала LeadGet. Тематика канала: лидогенерация через Telegram, B2B-маркетинг, рекламные платформы (Яндекс, VK, Google, Meta, Telegram Ads), инструменты для продаж и конверсии.
+  const cached = `Оцени релевантность этой новости для Telegram-канала LeadGet. Тематика канала: лидогенерация через Telegram, B2B-маркетинг, рекламные платформы (Яндекс, VK, Google, Meta, Telegram Ads), инструменты для продаж и конверсии.
 
 Высокая оценка (8–10): конкретное обновление рекламной платформы с цифрами, новый инструмент для лидогенерации/атрибуции, исследование рынка с данными, Telegram-маркетинг.
 Средняя (5–7): общие маркетинговые тренды с данными, смежные темы (e-commerce, retention).
 Низкая (1–4): корпоративные новости без данных, SEO-теория, ивент-анонсы, колонки мнений, HR, дизайн.
-${examplesBlock}
-Источник: ${c.source}
+${examplesBlock}`;
+  const dynamic = `Источник: ${c.source}
 Заголовок: ${c.title}
 Описание: ${c.description?.slice(0, 500) ?? ''}
 
 Верни только число от 1 до 10. Никаких пояснений.`;
+  return { cached, dynamic };
 }
 
 export function summaryPrompt(c: Candidate): string {
@@ -117,14 +121,15 @@ function toneBlock(samples: ToneSamples | undefined): string {
   return parts.join('\n');
 }
 
-export function postPrompt(c: Candidate, tone?: ToneSamples): string {
-  return `${NEWS_TZ}${toneBlock(tone)}
-
-ИСХОДНАЯ НОВОСТЬ:
+// cached: TZ + примеры стиля — одинаковы для каждой строки в одном прогоне publish.
+export function postPrompt(c: Candidate, tone?: ToneSamples): Prompt {
+  const cached = `${NEWS_TZ}${toneBlock(tone)}`;
+  const dynamic = `ИСХОДНАЯ НОВОСТЬ:
 Источник: ${c.source}
 Заголовок: ${c.title}
 Ссылка: ${c.link}
 Описание: ${c.description?.slice(0, 3000) ?? ''}`;
+  return { cached, dynamic };
 }
 
 const FEATURE_TZ = `Ты редактор Telegram-канала LeadGet (@Leadget_channel). Пишешь пост про новую функцию или улучшение сервиса. Аудитория: МСП, маркетологи, предприниматели.

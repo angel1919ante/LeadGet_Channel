@@ -1,8 +1,21 @@
 const MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-haiku-4.5';
 
-export async function callLLM(prompt: string): Promise<string> {
+// Промпт можно разбить на статичную часть (правила, TZ — одинаковую между
+// вызовами в одном цикле) и динамичную (конкретные данные). Anthropic-модели
+// на OpenRouter кэшируют статичный блок через cache_control — платим за него
+// один раз за 5 минут, а не при каждом вызове в цикле.
+export type Prompt = string | { cached: string; dynamic: string };
+
+export async function callLLM(prompt: Prompt): Promise<string> {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error('OPENROUTER_API_KEY env var missing');
+
+  const content = typeof prompt === 'string'
+    ? prompt
+    : [
+        { type: 'text', text: prompt.cached, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: prompt.dynamic },
+      ];
 
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -14,7 +27,7 @@ export async function callLLM(prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       model: MODEL,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content }],
       temperature: 0.6,
     }),
   });
