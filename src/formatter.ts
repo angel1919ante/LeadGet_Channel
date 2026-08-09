@@ -1,24 +1,19 @@
-import { callLLM } from './llm.ts';
+// Форматирование поста в HTML для Telegram без LLM-вызова.
+// Регулярные замены надёжнее — LLM срезал эмодзи и менял разметку.
 
-const FORMAT_PROMPT = `Отформатируй пост для Telegram канала. Используй только HTML-теги, никакого Markdown.
+export async function formatPost(raw: string): Promise<string> {
+  let text = raw;
 
-Правила:
-- Заголовок (первая строка с эмодзи): <b>текст</b>
-- Ключевые числа в backtick \`4 739\` → <code>4 739</code>
-- Блок-цитата [QUOTE]...[/QUOTE] → <blockquote>...</blockquote>
-- Важные факты и названия можно <b>выделить</b> если нужно
-- Буллеты • оставь как есть
-- Эмодзи оставь как есть, не переставляй
-- Пустые строки между блоками оставь
+  // [QUOTE]...[/QUOTE] → <blockquote>
+  text = text.replace(/\[QUOTE\]([\s\S]*?)\[\/QUOTE\]/g, (_, inner) =>
+    `<blockquote>${inner.trim()}</blockquote>`
+  );
 
-Запрещено:
-- Длинное тире (—), только запятая или точка
-- Markdown (*, _, **), только HTML теги
-- Добавлять или убирать эмодзи
-- Менять порядок эмодзи (они стоят ПОСЛЕ текста пункта)
+  // `цифра или текст` → <b>
+  text = text.replace(/`([^`]+)`/g, '<b>$1</b>');
 
-Верни ТОЛЬКО отформатированный текст, без комментариев.`;
+  // Первая строка (заголовок) → <b>
+  text = text.replace(/^(.+)$/m, '<b>$1</b>');
 
-export async function formatPost(rawPost: string): Promise<string> {
-  return callLLM(`${FORMAT_PROMPT}\n\n${rawPost}`);
+  return text;
 }
