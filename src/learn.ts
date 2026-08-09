@@ -43,36 +43,25 @@ async function main(): Promise<void> {
   const threshold = findThreshold(scoredDecided);
   console.log(`learn: решено=${decided.length}, порог=${threshold}`);
 
-  // Статистика по источникам
-  const bySource = new Map<string, { scores: number[]; positive: number; negative: number }>();
+  // Статистика по источникам: сразу раскладываем оценки по positive/negative
+  const bySource = new Map<string, { positive: number[]; negative: number[] }>();
 
   for (const r of decided) {
     const key = r.source || 'unknown';
-    if (!bySource.has(key)) bySource.set(key, { scores: [], positive: 0, negative: 0 });
+    if (!bySource.has(key)) bySource.set(key, { positive: [], negative: [] });
     const entry = bySource.get(key)!;
     const score = toScore(r.rating);
-    entry.scores.push(score);
-    if (r.status === 'approved' || r.status === 'posted') entry.positive++;
-    else entry.negative++;
+    const isPositive = r.status === 'approved' || r.status === 'posted';
+    (isPositive ? entry.positive : entry.negative).push(score);
   }
+
+  const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
 
   const prefRows: PreferenceRow[] = [];
 
   for (const [source, s] of bySource) {
-    const total = s.positive + s.negative;
-    const approvalRate = s.positive / total;
-
-    const positiveScores = [];
-    const negativeScores = [];
-    let si = 0;
-    for (const r of decided) {
-      if ((r.source || 'unknown') !== source) continue;
-      const score = s.scores[si++];
-      if (r.status === 'approved' || r.status === 'posted') positiveScores.push(score);
-      else negativeScores.push(score);
-    }
-
-    const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    const total = s.positive.length + s.negative.length;
+    const approvalRate = s.positive.length / total;
 
     // Доверие: минимум 5 наблюдений для уверенного вывода
     let trust = 'normal';
@@ -84,10 +73,10 @@ async function main(): Promise<void> {
     prefRows.push({
       source,
       total,
-      approved: s.positive,
-      rejected: s.negative,
-      avgRatingApproved: avg(positiveScores),
-      avgRatingRejected: avg(negativeScores),
+      approved: s.positive.length,
+      rejected: s.negative.length,
+      avgRatingApproved: avg(s.positive),
+      avgRatingRejected: avg(s.negative),
       trust,
       globalThreshold: threshold,
     });
