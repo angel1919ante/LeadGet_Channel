@@ -125,6 +125,26 @@ async function main(): Promise<void> {
     return;
   }
 
+  // TEST_FEATURE_TITLE: прямой пост про фичу без ContentPlan
+  const testFeatureTitle = process.env.TEST_FEATURE_TITLE;
+  if (testFeatureTitle) {
+    console.log(`TEST MODE: feature "${testFeatureTitle}"`);
+    const fakeRow: ContentPlanRow = {
+      rowNumber: -1, date: '', type: 'фича',
+      title: testFeatureTitle,
+      token: '',
+      data: JSON.stringify({
+        problem: process.env.TEST_FEATURE_PROBLEM ?? '',
+        description: process.env.TEST_FEATURE_DESCRIPTION ?? '',
+      }),
+      status: 'approved', post: '',
+    };
+    const rawPost = await handleFeature(fakeRow);
+    const formatted = await formatPost(rawPost);
+    await postAndRecord('фича', formatted, `feature:${testFeatureTitle}`);
+    return;
+  }
+
   const today = todayDMY();
   console.log(`autopost: today=${today}`);
 
