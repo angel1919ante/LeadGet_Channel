@@ -9,37 +9,44 @@ export const PALETTE = {
   secondaryText: '#4A4339',
 };
 
-// Маскот описывается для LLM-концепта; визуальный референс — references/<type>/02_totem_cover_horizontal.png
-export const MASCOT_DESCRIPTION = `a minimalist human-like mascot character:
-always wearing a plain black hoodie, a long forest-green cap with an elongated
-bill, glasses in a simple non-cartoonish style (not round joke-glasses), a
-minimalist stylish face that is neither childish nor overly cartoonish, a tiny
-green brand mark on the hoodie as a subtle detail, no visible shadows, no
-gradients, clean white or cream background around the character, thick even
-black outline, flat solid shapes only, this is NOT a robot`;
+// Маскот описывается для LLM-концепта; визуальный референс — references/mascot/*.png
+export const MASCOT_DESCRIPTION = `a minimalist chibi-style mascot character:
+always sitting cross-legged on the ground in a compact rounded pose, stubby
+simplified round body, always wearing a plain black hoodie, a long
+forest-green cap with an elongated bill, glasses in a simple non-cartoonish
+style (not round joke-glasses), a minimalist stylish face that is neither
+childish nor overly cartoonish, a tiny green brand mark on the hoodie as a
+subtle detail, exactly two arms and two hands held close to the body or in
+the lap (never reaching far from the torso, never a standing or walking
+pose), no visible shadows, no gradients, clean white or cream background
+around the character, thick even black outline, flat solid shapes only,
+this is NOT a robot`;
 
 export const POSE_OPTIONS = [
   {
-    context: 'приветствие / позитивная новость',
-    pose: 'friendly warm smile, slightly narrowed happy eyes, one hand raised in a casual wave',
+    context: 'работа / фокус / аналитика',
+    pose: 'sitting cross-legged, looking down at a laptop resting directly on the lap, both hands on the laptop keyboard',
   },
   {
-    context: 'аналитика / кейс / разбор',
-    pose: 'focused thoughtful expression, standing at a marker whiteboard, writing or looking at notes',
+    context: 'telegram / мессенджер / общение',
+    pose: 'sitting cross-legged, holding a smartphone with both hands close to the chest, focused look at the screen',
   },
   {
-    context: 'объяснение механики / как это работает',
-    pose: 'pointing at a simple diagram, funnel scheme, or metrics chart on a board',
+    context: 'вывод / позиция / цитата',
+    pose: 'sitting cross-legged, holding a large rounded speech-bubble sign with both hands in front of the body',
+  },
+  {
+    context: 'разбор / вывод / инсайт',
+    pose: 'sitting cross-legged, one hand near the chin in a thinking gesture, the other hand resting on the knee, small simple abstract icons floating above the head instead of a background scene',
   },
 ] as const;
 
 export const PROP_OPTIONS = [
-  'a marker whiteboard with a simple abstract diagram (no readable text)',
-  'a laptop on a small simple table',
-  'a simple funnel-shaped diagram sketch',
-  'a small stack of paper cards on a table',
-  'simple minimal furniture, a small table',
-  'a cat resting on a small green cushion as a secondary cozy detail',
+  'a laptop resting directly on the lap, no table',
+  'a smartphone held in both hands',
+  'a large rounded speech-bubble sign held in both hands',
+  'small simple icons floating above the head (magnifying glass, growth chart, checkmark) instead of a held prop',
+  'a simple funnel-shaped diagram floating beside the character, not held',
 ] as const;
 
 // Базовые промпты фона/стиля по типу поста
@@ -75,7 +82,10 @@ no neon glow, no UI/interface clichés, no oversized cartoon faces, no giant
 noses, no balaclavas, no weird round joke-glasses, no extra facial details,
 no chaotic or busy backgrounds, no repeated identical coffee cup prop, no
 random unrelated props, no repeated identical pose across images, no text,
-no logos, no watermark, no readable letters or numbers anywhere in the image`;
+no logos, no watermark, no readable letters or numbers anywhere in the image,
+no extra limbs, no extra arms, no extra hands, no third arm, no deformed or
+extra fingers, no floating disconnected hands, no standing or walking pose
+for the mascot, the mascot always has exactly two arms and two hands`;
 
 export const STYLE_DESCRIPTORS = `flat illustration, zine/sticker aesthetic,
 thick even black outline, flat solid shapes, no gradients, no textures, no

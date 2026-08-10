@@ -3,24 +3,17 @@ import { join } from 'node:path';
 import { callLLM } from './llm.ts';
 import { buildConceptInstruction, buildAnimationPrompt, buildFinalPrompt, NEGATIVE_PROMPT } from './brandDesign.ts';
 
-const REFERENCES_DIR = join(process.cwd(), 'references');
+const REFERENCES_DIR = join(process.cwd(), 'references', 'mascot');
 const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp'];
 
-// Тип поста → папка с референсами.
-const POST_TYPE_FOLDER: Record<string, string> = {
-  'новость': 'news',
-  'фича': 'feature',
-  'кейс': 'case',
-};
-
-function findReferenceImage(postType: string): string | undefined {
-  const folder = POST_TYPE_FOLDER[postType];
-  if (!folder) return undefined;
-  const dir = join(REFERENCES_DIR, folder);
+// Референсы маскота одни на все типы постов (не завязаны на тип) —
+// берём случайный, чтобы Flux видел разные позы, а не одну и ту же картинку каждый раз.
+function findReferenceImage(): string | undefined {
   try {
-    const file = readdirSync(dir).find((f) => IMAGE_EXT.includes(f.slice(f.lastIndexOf('.')).toLowerCase()));
-    if (!file) return undefined;
-    const buf = readFileSync(join(dir, file));
+    const files = readdirSync(REFERENCES_DIR).filter((f) => IMAGE_EXT.includes(f.slice(f.lastIndexOf('.')).toLowerCase()));
+    if (!files.length) return undefined;
+    const file = files[Math.floor(Math.random() * files.length)];
+    const buf = readFileSync(join(REFERENCES_DIR, file));
     const ext = file.slice(file.lastIndexOf('.') + 1).toLowerCase();
     const mime = ext === 'jpg' ? 'jpeg' : ext;
     return `data:image/${mime};base64,${buf.toString('base64')}`;
@@ -48,7 +41,7 @@ export async function generateImage(concept: string, postType?: string): Promise
   if (!token) throw new Error('REPLICATE_API_TOKEN env var missing');
 
   const fullPrompt = buildFinalPrompt(concept);
-  const referenceImage = postType ? findReferenceImage(postType) : undefined;
+  const referenceImage = findReferenceImage();
   console.log(`generateImage [${postType}]: reference=${referenceImage ? 'yes (' + Math.round(referenceImage.length / 1024) + 'KB base64)' : 'no'}`);
 
   const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-1.1-pro/predictions', {
