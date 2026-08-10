@@ -33,22 +33,23 @@ export async function generateImageConcept(post: string, postType: string): Prom
   const prompt = `${buildConceptInstruction(postType)}
 
 Текст поста: ${post}`;
-  return callLLM(prompt);
+  const concept = await callLLM(prompt);
+  console.log(`image concept [${postType}]: ${concept}`);
+  return concept;
 }
 
 // ponytail: raw fetch to Replicate REST API instead of the `replicate` SDK —
 // this file already needs only create+poll, matches the fetch-based style of llm.ts/telegram.ts.
 //
 // Если в references/<postType>/ лежит картинка, передаём её как image_prompt
-// (Flux Redux-style reference). ВАЖНО: этот параметр не проверен живым вызовом
-// (нет доступа к REPLICATE_API_TOKEN отсюда) — при первом реальном запуске
-// с референсом стоит свериться с логами Replicate, что параметр принят.
+// (Flux Redux-style reference).
 export async function generateImage(concept: string, postType?: string): Promise<string> {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) throw new Error('REPLICATE_API_TOKEN env var missing');
 
   const fullPrompt = buildFinalPrompt(concept);
   const referenceImage = postType ? findReferenceImage(postType) : undefined;
+  console.log(`generateImage [${postType}]: reference=${referenceImage ? 'yes (' + Math.round(referenceImage.length / 1024) + 'KB base64)' : 'no'}`);
 
   const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-1.1-pro/predictions', {
     method: 'POST',
@@ -99,6 +100,7 @@ export async function generateImage(concept: string, postType?: string): Promise
   const output = prediction.output;
   const url = Array.isArray(output) ? output[0] : output;
   if (!url) throw new Error('Replicate returned no output URL');
+  console.log(`generateImage done: ${url}`);
   return url;
 }
 
