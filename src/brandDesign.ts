@@ -124,13 +124,12 @@ ${contexts}
 Верни ТОЛЬКО готовый промпт для генерации картинки на английском, одной строкой, максимально конкретный.`;
 }
 
+// flux-2-max не поддерживает negative_prompt — запреты идут прямо в текст промпта.
 export function buildFinalPrompt(concept: string): string {
-  return `${concept}, ${STYLE_DESCRIPTORS}, 1:1 square composition, high quality, highly detailed flat illustration`;
+  return `${concept}, ${STYLE_DESCRIPTORS}, 1:1 square composition, high quality, highly detailed flat illustration. Avoid: ${AVOID_LIST}`;
 }
 
 // Промпт для анимации (wan2.1-i2v-480p): лёгкое движение, не трансформация
 export function buildAnimationPrompt(concept: string): string {
   return `subtle camera push-in, gentle ambient motion, ${concept}, no fast cuts, no scene change, calm loop-friendly movement`;
 }
-
-export const NEGATIVE_PROMPT = AVOID_LIST;

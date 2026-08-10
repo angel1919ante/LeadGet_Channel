@@ -1,24 +1,28 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { callLLM } from './llm.ts';
-import { buildConceptInstruction, buildAnimationPrompt, buildFinalPrompt, NEGATIVE_PROMPT } from './brandDesign.ts';
+import { buildConceptInstruction, buildAnimationPrompt, buildFinalPrompt } from './brandDesign.ts';
 
 const REFERENCES_DIR = join(process.cwd(), 'references', 'mascot');
 const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp'];
+const MAX_REFERENCES = 8; // лимит flux-2-max input_images
 
-// Референсы маскота одни на все типы постов (не завязаны на тип) —
-// берём случайный, чтобы Flux видел разные позы, а не одну и ту же картинку каждый раз.
-function findReferenceImage(): string | undefined {
+// Референсы маскота одни на все типы постов — flux-2-max держит консистентность
+// персонажа лучше по нескольким референсам сразу (лицо, поза, одежда, палитра),
+// поэтому передаём все файлы из папки, а не один случайный.
+function findReferenceImages(): string[] {
   try {
-    const files = readdirSync(REFERENCES_DIR).filter((f) => IMAGE_EXT.includes(f.slice(f.lastIndexOf('.')).toLowerCase()));
-    if (!files.length) return undefined;
-    const file = files[Math.floor(Math.random() * files.length)];
-    const buf = readFileSync(join(REFERENCES_DIR, file));
-    const ext = file.slice(file.lastIndexOf('.') + 1).toLowerCase();
-    const mime = ext === 'jpg' ? 'jpeg' : ext;
-    return `data:image/${mime};base64,${buf.toString('base64')}`;
+    const files = readdirSync(REFERENCES_DIR)
+      .filter((f) => IMAGE_EXT.includes(f.slice(f.lastIndexOf('.')).toLowerCase()))
+      .slice(0, MAX_REFERENCES);
+    return files.map((file) => {
+      const buf = readFileSync(join(REFERENCES_DIR, file));
+      const ext = file.slice(file.lastIndexOf('.') + 1).toLowerCase();
+      const mime = ext === 'jpg' ? 'jpeg' : ext;
+      return `data:image/${mime};base64,${buf.toString('base64')}`;
+    });
   } catch {
-    return undefined;
+    return [];
   }
 }
 
@@ -34,17 +38,19 @@ export async function generateImageConcept(post: string, postType: string): Prom
 // ponytail: raw fetch to Replicate REST API instead of the `replicate` SDK —
 // this file already needs only create+poll, matches the fetch-based style of llm.ts/telegram.ts.
 //
-// Если в references/<postType>/ лежит картинка, передаём её как image_prompt
-// (Flux Redux-style reference).
+// flux-2-max держит персонажа консистентным по нескольким референсам сразу
+// (лицо, поза, одежда, палитра) — передаём все файлы из references/mascot/
+// как input_images. У модели нет negative_prompt, поэтому запреты уже вшиты
+// в текст промпта через buildFinalPrompt.
 export async function generateImage(concept: string, postType?: string): Promise<string> {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) throw new Error('REPLICATE_API_TOKEN env var missing');
 
   const fullPrompt = buildFinalPrompt(concept);
-  const referenceImage = findReferenceImage();
-  console.log(`generateImage [${postType}]: reference=${referenceImage ? 'yes (' + Math.round(referenceImage.length / 1024) + 'KB base64)' : 'no'}`);
+  const referenceImages = findReferenceImages();
+  console.log(`generateImage [${postType}]: references=${referenceImages.length}`);
 
-  const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-1.1-pro/predictions', {
+  const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-2-max/predictions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -54,12 +60,11 @@ export async function generateImage(concept: string, postType?: string): Promise
     body: JSON.stringify({
       input: {
         prompt: fullPrompt,
-        negative_prompt: NEGATIVE_PROMPT,
-        width: 1024,
-        height: 1024,
+        input_images: referenceImages,
+        aspect_ratio: '1:1',
+        resolution: '2 MP',
         output_format: 'jpg',
         output_quality: 90,
-        ...(referenceImage ? { image_prompt: referenceImage } : {}),
       },
     }),
   });
