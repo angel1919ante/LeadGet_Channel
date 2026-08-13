@@ -1,5 +1,6 @@
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
+import { CustomFile } from 'telegram/client/uploads.js';
 
 let _client: TelegramClient | null = null;
 
@@ -31,10 +32,12 @@ export async function postAsUser(channelId: string, htmlText: string): Promise<v
 }
 
 // Постит фото + подпись в канал от имени пользователя.
-export async function sendPhotoAsUser(channelId: string, photoUrl: string, captionHtml: string): Promise<void> {
+// photo — URL строкой (Replicate и т.п.) или готовый Buffer (например из caseBoard.ts).
+export async function sendPhotoAsUser(channelId: string, photo: string | Buffer, captionHtml: string): Promise<void> {
   const client = await getClient();
+  const file = Buffer.isBuffer(photo) ? new CustomFile('photo.png', photo.length, '', photo) : photo;
   await client.sendFile(channelId, {
-    file: photoUrl,
+    file,
     caption: captionHtml,
     parseMode: 'html',
   });

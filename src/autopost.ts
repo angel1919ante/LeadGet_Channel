@@ -16,7 +16,8 @@ import { postPrompt, featurePostPrompt } from './prompts.ts';
 import { generateImageConcept, generateImage } from './imageGen.ts';
 import { formatPost } from './formatter.ts';
 import { postAsUser, sendPhotoAsUser, disconnectMTProto } from './mtproto.ts';
-import { generateCasePost } from './caseGen.ts';
+import { generateCase } from './caseGen.ts';
+import { renderCaseBoardCard } from './caseBoard.ts';
 import { loadToneSamples } from './toneSamples.ts';
 import type { Candidate, Source } from './types.ts';
 
@@ -33,6 +34,7 @@ async function postAndRecord(
   postType: string,
   postText: string,
   sourceRef: string,
+  preRenderedImage?: Buffer,
 ): Promise<void> {
   if (!channel) throw new Error('POST_CHANNEL env var missing');
   const skipImage = process.env.SKIP_IMAGE === 'true';
@@ -40,6 +42,9 @@ async function postAndRecord(
 
   if (skipImage) {
     await postAsUser(channel, postText);
+  } else if (preRenderedImage) {
+    await sendPhotoAsUser(channel, preRenderedImage, postText);
+    imageUrl = 'board';
   } else {
     const concept = await generateImageConcept(postText, postType);
     imageUrl = await generateImage(concept, postType);
@@ -119,9 +124,10 @@ async function main(): Promise<void> {
       data: process.env.TEST_CASE_DATA ?? '{}',
       status: 'approved', post: '',
     };
-    const rawPost = await generateCasePost(fakeRow);
-    const formatted = await formatPost(rawPost);
-    await postAndRecord('кейс', formatted, `leadget:${testToken}`);
+    const { postText, board } = await generateCase(fakeRow);
+    const formatted = await formatPost(postText);
+    const boardImage = await renderCaseBoardCard(board);
+    await postAndRecord('кейс', formatted, `leadget:${testToken}`, boardImage);
     return;
   }
 
@@ -161,6 +167,7 @@ async function main(): Promise<void> {
   let rawPost: string;
   let sourceRef: string;
   let newsRowNumber: number | undefined;
+  let boardImage: Buffer | undefined;
 
   try {
     if (planRow.type === 'новость') {
@@ -176,8 +183,10 @@ async function main(): Promise<void> {
       newsRowNumber = news.rowNumber;
     } else if (planRow.type === 'кейс') {
       if (!planRow.token) throw new Error('для кейса нужен Токен в ContentPlan');
-      rawPost = await generateCasePost(planRow);
+      const { postText, board } = await generateCase(planRow);
+      rawPost = postText;
       sourceRef = `leadget:${planRow.token}`;
+      boardImage = await renderCaseBoardCard(board);
     } else if (planRow.type === 'фича') {
       rawPost = await handleFeature(planRow);
       sourceRef = `feature:${planRow.title}`;
@@ -186,7 +195,7 @@ async function main(): Promise<void> {
     }
 
     const formatted = await formatPost(rawPost);
-    await postAndRecord(planRow.type, formatted, sourceRef);
+    await postAndRecord(planRow.type, formatted, sourceRef, boardImage);
     await updateContentPlanRow(planRow.rowNumber, { status: 'posted', post: formatted });
     if (newsRowNumber !== undefined) {
       await updateRow(newsRowNumber, { status: 'posted' });

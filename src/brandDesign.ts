@@ -133,3 +133,29 @@ export function buildFinalPrompt(concept: string): string {
 export function buildAnimationPrompt(concept: string): string {
   return `subtle camera push-in, gentle ambient motion, ${concept}, no fast cuts, no scene change, calm loop-friendly movement`;
 }
+
+// ── Шрифты реальной design system (LeadGet Design System.zip) ──────────
+// Unbounded — заголовки и крупные цифры, Golos Text — тело, JetBrains Mono —
+// мелкие подписи/лейблы. Используются в HTML-рендере карточек (caseBoard.ts),
+// не в Flux-промптах (Flux текст не рисует).
+export const FONTS_IMPORT_URL =
+  'https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap&subset=cyrillic,cyrillic-ext,latin';
+
+export const FONTS = {
+  display: "'Unbounded', sans-serif",
+  body: "'Golos Text', sans-serif",
+  mono: "'JetBrains Mono', monospace",
+};
+
+// ── Кейс-борд: фиксированный шаблон "маскот у доски с воронкой из 3 иконок" ──
+// Структура (мaскот, доска, расположение, стиль) всегда одна и та же.
+// Переменная часть — описание трёх иконок под конкретный кейс.
+export const DEFAULT_CASE_ICONS: [string, string, string] = [
+  'a paper airplane icon (outreach message)',
+  'a rounded square robot-head icon with two dot eyes and a small antenna (AI bot)',
+  'a person silhouette icon with a small checkmark badge next to it (qualified lead)',
+];
+
+export function buildCaseBoardConcept(icons: [string, string, string]): string {
+  return `Minimalist chibi mascot (${MASCOT_DESCRIPTION}) sitting cross-legged next to a large blank whiteboard sign propped on simple legs, holding a marker pen pointing at the board. On the board: three simple flat line-art icons in a horizontal row connected by two right-pointing arrows: first icon ${icons[0]}, second icon ${icons[1]}, third icon ${icons[2]}. Icons are forest green ${PALETTE.green} outline style, evenly spaced, each icon has empty blank space directly below it on the plain board background reserved for a number label (no boxes, no rectangles, no text, no numbers, no digits anywhere on the board or image). Warm cream background, subtle grid texture, flat solid shapes, thick black outline, no gradients, no shadows, no readable text or numbers anywhere.`;
+}

@@ -1,6 +1,7 @@
 import { callLLM } from './llm.ts';
 import { casePostPrompt } from './prompts.ts';
 import type { ContentPlanRow } from './sheets.ts';
+import type { CaseBoardNumber } from './caseBoard.ts';
 
 interface CampaignInfo {
   name: string;
@@ -59,7 +60,18 @@ function buildResultsString(s: CampaignSummary, price?: string): string {
   return `[QUOTE]${inner}[/QUOTE]`;
 }
 
-export async function generateCasePost(row: ContentPlanRow): Promise<string> {
+export interface CaseBoardData {
+  title: string;
+  subtitle: string;
+  numbers: [CaseBoardNumber, CaseBoardNumber, CaseBoardNumber];
+}
+
+export interface CaseGenResult {
+  postText: string;
+  board: CaseBoardData;
+}
+
+export async function generateCase(row: ContentPlanRow): Promise<CaseGenResult> {
   let data: Record<string, string> = {};
   try {
     data = row.data ? JSON.parse(row.data) : {};
@@ -81,5 +93,20 @@ export async function generateCasePost(row: ContentPlanRow): Promise<string> {
 
   const rawPost = await callLLM(casePostPrompt(niche, task, mechanics));
   // Inject results directly — LLM cannot strip [QUOTE] tags this way
-  return rawPost.replace('<<RESULTS>>', results);
+  const postText = rawPost.replace('<<RESULTS>>', results);
+
+  // Схема цифр борда: отправок / квал. лидов / гибкая третья (цена контакта, если есть, иначе конверсия)
+  const board: CaseBoardData = {
+    title: data.boardTitle ?? niche,
+    subtitle: data.boardSubtitle ?? 'Выход на аудиторию в Telegram',
+    numbers: [
+      { value: String(summary.sent), label: 'отправок' },
+      { value: String(summary.leads), label: 'квал. лидов' },
+      data.price
+        ? { value: `${data.price} ₽`, label: 'контакт' }
+        : { value: pct(summary.leads, summary.sent), label: 'конверсия' },
+    ],
+  };
+
+  return { postText, board };
 }
