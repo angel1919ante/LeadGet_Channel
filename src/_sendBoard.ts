@@ -12,12 +12,12 @@ async function main() {
   const client = new TelegramClient(new StringSession(session), apiId, apiHash, { connectionRetries: 3 });
   await client.connect();
 
-  const buf = readFileSync('.tmp_cards_2/final_raw.png');
-  const file = new CustomFile('case_seoai.png', buf.length, '.tmp_cards_2/final_raw.png', buf);
+  const buf = readFileSync('.tmp_cards_2/patched.png');
+  const file = new CustomFile('case_seoai.png', buf.length, '.tmp_cards_2/patched.png', buf);
 
   await client.sendFile('@LeadGet_reviews', {
     file,
-    caption: '📊 Тест: превью кейса SeoAI (доска-воронка, честные цифры от 2431 отправки)',
+    caption: '📊 Тест: превью кейса SeoAI (тот же шаблон, что и Авито, честные цифры от 2431 отправки)',
   });
 
   console.log('sent');
