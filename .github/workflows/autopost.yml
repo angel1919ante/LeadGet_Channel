@@ -17,7 +17,6 @@ on:
           - test-case
           - test-feature
           - learn
-          - gen-case-preview
       test_case_token:
         description: 'Токен кампании для теста (только для test-case)'
         required: false
@@ -124,21 +123,6 @@ jobs:
           TEST_FEATURE_TITLE: ${{ github.event.inputs.test_feature_title }}
           TEST_FEATURE_PROBLEM: ${{ github.event.inputs.test_feature_problem }}
           TEST_FEATURE_DESCRIPTION: ${{ github.event.inputs.test_feature_description }}
-
-  gen-case-preview:
-    if: github.event.inputs.job == 'gen-case-preview'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm ci
-      - run: npx tsx src/_genCasePreview.ts
-        env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
-          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
 
   learn:
     if: github.event.inputs.job == 'learn'
