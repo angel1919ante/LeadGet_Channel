@@ -159,7 +159,7 @@ export async function getAllRows(): Promise<SheetRow[]> {
 }
 
 export async function appendPending(
-  rows: Array<{ source: string; title: string; summary: string; link: string; rating: number }>,
+  rows: Array<{ source: string; title: string; summary: string; link: string; rating: number; status?: string }>,
 ): Promise<void> {
   if (rows.length === 0) return;
   const sheets = getClient();
@@ -172,7 +172,7 @@ export async function appendPending(
     '',
     r.link,
     String(r.rating),
-    'pending',
+    r.status ?? 'pending',
     'нет',
   ]);
   await sheets.spreadsheets.values.append({
