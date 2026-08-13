@@ -17,7 +17,7 @@ on:
           - test-case
           - test-feature
           - learn
-          - send-seo-post
+          - check-channel
       test_case_token:
         description: 'Токен кампании для теста (только для test-case)'
         required: false
@@ -125,8 +125,8 @@ jobs:
           TEST_FEATURE_PROBLEM: ${{ github.event.inputs.test_feature_problem }}
           TEST_FEATURE_DESCRIPTION: ${{ github.event.inputs.test_feature_description }}
 
-  send-seo-post:
-    if: github.event.inputs.job == 'send-seo-post'
+  check-channel:
+    if: github.event.inputs.job == 'check-channel'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -134,7 +134,7 @@ jobs:
         with:
           node-version: '20'
       - run: npm ci
-      - run: npx tsx src/_sendSeoPost.ts
+      - run: npx tsx src/_checkChannel.ts
         env:
           TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
