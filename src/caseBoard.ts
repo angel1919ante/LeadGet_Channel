@@ -87,9 +87,9 @@ export async function renderCaseBoardCard(opts: CaseBoardOptions): Promise<Buffe
   .col { position:absolute; top:408px; width:150px; text-align:center; }
   .col .n { font-family:${FONTS.display}; font-size:32px; font-weight:700; letter-spacing:-0.03em; color:${PALETTE.green}; display:block; }
   .col .l { font-family:${FONTS.mono}; font-size:13px; font-weight:500; letter-spacing:0.03em; color:${PALETTE.green}; display:inline-block; margin-top:8px; border-bottom:3px solid ${PALETTE.green}; padding-bottom:6px; }
-  .col.c1 { left:640px; }
-  .col.c2 { left:825px; }
-  .col.c3 { left:1010px; }
+  .col.c1 { left:579px; }
+  .col.c2 { left:753px; }
+  .col.c3 { left:921px; }
 
   .logo { position:absolute; bottom:32px; right:50px; height:48px; }
 </style></head>
