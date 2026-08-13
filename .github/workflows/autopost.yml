@@ -17,6 +17,7 @@ on:
           - test-case
           - test-feature
           - learn
+          - send-seo-post
       test_case_token:
         description: 'Токен кампании для теста (только для test-case)'
         required: false
@@ -123,6 +124,21 @@ jobs:
           TEST_FEATURE_TITLE: ${{ github.event.inputs.test_feature_title }}
           TEST_FEATURE_PROBLEM: ${{ github.event.inputs.test_feature_problem }}
           TEST_FEATURE_DESCRIPTION: ${{ github.event.inputs.test_feature_description }}
+
+  send-seo-post:
+    if: github.event.inputs.job == 'send-seo-post'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npx tsx src/_sendSeoPost.ts
+        env:
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
 
   learn:
     if: github.event.inputs.job == 'learn'
