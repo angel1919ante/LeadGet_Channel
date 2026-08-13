@@ -17,6 +17,7 @@ on:
           - test-case
           - test-feature
           - learn
+          - gen-case-board
       test_case_token:
         description: 'Токен кампании для теста (только для test-case)'
         required: false
@@ -123,6 +124,19 @@ jobs:
           TEST_FEATURE_TITLE: ${{ github.event.inputs.test_feature_title }}
           TEST_FEATURE_PROBLEM: ${{ github.event.inputs.test_feature_problem }}
           TEST_FEATURE_DESCRIPTION: ${{ github.event.inputs.test_feature_description }}
+
+  gen-case-board:
+    if: github.event.inputs.job == 'gen-case-board'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npx tsx src/_genCaseBoard.ts
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
 
   learn:
     if: github.event.inputs.job == 'learn'
