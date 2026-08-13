@@ -147,15 +147,5 @@ export const FONTS = {
   mono: "'JetBrains Mono', monospace",
 };
 
-// ── Кейс-борд: фиксированный шаблон "маскот у доски с воронкой из 3 иконок" ──
-// Структура (мaскот, доска, расположение, стиль) всегда одна и та же.
-// Переменная часть — описание трёх иконок под конкретный кейс.
-export const DEFAULT_CASE_ICONS: [string, string, string] = [
-  'a paper airplane icon (outreach message)',
-  'a rounded square robot-head icon with two dot eyes and a small antenna (AI bot)',
-  'a person silhouette icon with a small checkmark badge next to it (qualified lead)',
-];
-
-export function buildCaseBoardConcept(icons: [string, string, string]): string {
-  return `Minimalist chibi mascot (${MASCOT_DESCRIPTION}) sitting cross-legged next to a large blank whiteboard sign propped on simple legs, holding a marker pen pointing at the board. The mascot's other hand (not holding the pen) rests empty and open on its own knee or lap, not holding any object, phone, notepad, or prop of any kind. On the board: three simple flat line-art icons in a horizontal row connected by two right-pointing arrows: first icon ${icons[0]}, second icon ${icons[1]}, third icon ${icons[2]}. Icons are forest green ${PALETTE.green} outline style, evenly spaced. Below the icons the board is completely plain and empty cream surface with only the faint grid texture, nothing else drawn there: no box, no rectangle, no square, no frame, no outline, no placeholder shape, no underline, no text, no numbers, no digits anywhere below the icons or anywhere else in the image. Warm cream background, subtle grid texture, flat solid shapes, thick black outline, no gradients, no shadows.`;
-}
+// Кейс-борд (маскот + доска + иконки + цифры) больше не идёт через Flux —
+// он полностью детерминированный SVG/HTML-рендер, см. caseBoard.ts.
