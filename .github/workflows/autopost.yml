@@ -18,6 +18,7 @@ on:
           - test-feature
           - learn
           - download-last
+          - test-board
       test_case_token:
         description: 'Токен кампании для теста (только для test-case)'
         required: false
@@ -143,6 +144,23 @@ jobs:
         with:
           name: last-photo
           path: last_photo_*.png
+
+  test-board:
+    if: github.event.inputs.job == 'test-board'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npx tsx src/_testBoard.ts
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: board-test
+          path: board_test.png
 
   learn:
     if: github.event.inputs.job == 'learn'
