@@ -20,15 +20,17 @@ function escapeHtml(s: string): string {
 // "отправка → бот → лид", подходит для большинства кейсов. Под конкретную
 // нишу можно передать другой набор ключей (см. CaseBoardOptions.icons).
 const ICONS: Record<string, string> = {
-  outreach: `<path d="M12 46 L88 12 L58 58 L44 88 L36 56 Z" fill="none" stroke="${PALETTE.green}" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/><line x1="58" y1="58" x2="36" y2="56" stroke="${PALETTE.green}" stroke-width="6" stroke-linecap="round"/>`,
-  bot: `<rect x="20" y="30" width="60" height="55" rx="18" fill="none" stroke="${PALETTE.green}" stroke-width="6"/><circle cx="40" cy="55" r="5" fill="${PALETTE.green}"/><circle cx="60" cy="55" r="5" fill="${PALETTE.green}"/><line x1="50" y1="30" x2="50" y2="16" stroke="${PALETTE.green}" stroke-width="6" stroke-linecap="round"/><circle cx="50" cy="10" r="6" fill="none" stroke="${PALETTE.green}" stroke-width="6"/>`,
-  lead: `<circle cx="42" cy="26" r="16" fill="none" stroke="${PALETTE.green}" stroke-width="6"/><path d="M18 88 Q18 54 42 54 Q66 54 66 88" fill="none" stroke="${PALETTE.green}" stroke-width="6" stroke-linecap="round"/><circle cx="76" cy="68" r="17" fill="${PALETTE.green}"/><path d="M68 68 L74 74 L85 60" fill="none" stroke="${PALETTE.cream}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`,
-  target: `<circle cx="50" cy="50" r="36" fill="none" stroke="${PALETTE.green}" stroke-width="6"/><circle cx="50" cy="50" r="20" fill="none" stroke="${PALETTE.green}" stroke-width="6"/><circle cx="50" cy="50" r="6" fill="${PALETTE.green}"/><line x1="50" y1="4" x2="50" y2="18" stroke="${PALETTE.green}" stroke-width="6" stroke-linecap="round"/><line x1="82" y1="18" x2="72" y2="28" stroke="${PALETTE.green}" stroke-width="6" stroke-linecap="round"/>`,
-  document: `<path d="M28 8 H62 L78 24 V92 H28 Z" fill="none" stroke="${PALETTE.green}" stroke-width="6" stroke-linejoin="round"/><path d="M62 8 V24 H78" fill="none" stroke="${PALETTE.green}" stroke-width="6" stroke-linejoin="round"/><line x1="38" y1="45" x2="68" y2="45" stroke="${PALETTE.green}" stroke-width="5" stroke-linecap="round"/><line x1="38" y1="60" x2="68" y2="60" stroke="${PALETTE.green}" stroke-width="5" stroke-linecap="round"/><line x1="38" y1="75" x2="58" y2="75" stroke="${PALETTE.green}" stroke-width="5" stroke-linecap="round"/>`,
-  chart: `<line x1="12" y1="90" x2="12" y2="10" stroke="${PALETTE.green}" stroke-width="6" stroke-linecap="round"/><line x1="12" y1="90" x2="92" y2="90" stroke="${PALETTE.green}" stroke-width="6" stroke-linecap="round"/><path d="M22 68 L44 48 L60 60 L86 22" fill="none" stroke="${PALETTE.green}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M68 22 H86 V40" fill="none" stroke="${PALETTE.green}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`,
+  // Чёрная заливка (не зелёный контур) — как в эталонном референсе: магазин/бизнес.
+  shop: `<path d="M4 32 L12 10 H88 L96 32 Z" fill="${PALETTE.nearBlack}"/><rect x="10" y="32" width="80" height="58" fill="${PALETTE.nearBlack}"/><rect x="20" y="42" width="20" height="20" fill="${PALETTE.cream}"/><rect x="60" y="42" width="20" height="20" fill="${PALETTE.cream}"/><rect x="42" y="68" width="16" height="22" fill="${PALETTE.cream}"/>`,
+  // Толстая зелёная рамка-квадрат вокруг мордочки бота.
+  bot: `<rect x="12" y="12" width="76" height="76" rx="24" fill="none" stroke="${PALETTE.green}" stroke-width="9"/><circle cx="38" cy="52" r="7" fill="${PALETTE.green}"/><circle cx="62" cy="52" r="7" fill="${PALETTE.green}"/><path d="M38 68 Q50 76 62 68" fill="none" stroke="${PALETTE.green}" stroke-width="7" stroke-linecap="round"/><line x1="50" y1="12" x2="50" y2="2" stroke="${PALETTE.green}" stroke-width="7" stroke-linecap="round"/><circle cx="50" cy="2" r="5" fill="${PALETTE.green}"/>`,
+  lead: `<circle cx="38" cy="24" r="17" fill="none" stroke="${PALETTE.green}" stroke-width="8"/><path d="M10 90 Q10 50 38 50 Q66 50 66 90" fill="none" stroke="${PALETTE.green}" stroke-width="8" stroke-linecap="round"/><circle cx="78" cy="64" r="19" fill="${PALETTE.green}"/><path d="M68 64 L75 71 L89 55" fill="none" stroke="${PALETTE.cream}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`,
+  target: `<circle cx="50" cy="50" r="38" fill="none" stroke="${PALETTE.green}" stroke-width="8"/><circle cx="50" cy="50" r="21" fill="none" stroke="${PALETTE.green}" stroke-width="8"/><circle cx="50" cy="50" r="7" fill="${PALETTE.green}"/>`,
+  document: `<path d="M24 4 H62 L80 22 V96 H24 Z" fill="none" stroke="${PALETTE.green}" stroke-width="8" stroke-linejoin="round"/><path d="M62 4 V22 H80" fill="none" stroke="${PALETTE.green}" stroke-width="8" stroke-linejoin="round"/><line x1="35" y1="45" x2="69" y2="45" stroke="${PALETTE.green}" stroke-width="6" stroke-linecap="round"/><line x1="35" y1="62" x2="69" y2="62" stroke="${PALETTE.green}" stroke-width="6" stroke-linecap="round"/><line x1="35" y1="79" x2="55" y2="79" stroke="${PALETTE.green}" stroke-width="6" stroke-linecap="round"/>`,
+  chart: `<path d="M14 92 L14 8" stroke="${PALETTE.green}" stroke-width="8" stroke-linecap="round"/><path d="M14 92 L92 92" stroke="${PALETTE.green}" stroke-width="8" stroke-linecap="round"/><path d="M24 66 L46 44 L62 56 L88 18" fill="none" stroke="${PALETTE.green}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M68 18 H88 V38" fill="none" stroke="${PALETTE.green}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`,
 };
 
-export const DEFAULT_ICON_KEYS: [string, string, string] = ['outreach', 'bot', 'lead'];
+export const DEFAULT_ICON_KEYS: [string, string, string] = ['shop', 'bot', 'lead'];
 
 export interface CaseBoardNumber {
   value: string;
@@ -44,7 +46,7 @@ export interface CaseBoardOptions {
 
 function iconSvg(key: string): string {
   const paths = ICONS[key] ?? ICONS.outreach;
-  return `<svg viewBox="0 0 100 100" width="84" height="84">${paths}</svg>`;
+  return `<svg viewBox="0 0 100 100" width="92" height="92">${paths}</svg>`;
 }
 
 export async function renderCaseBoardCard(opts: CaseBoardOptions): Promise<Buffer> {
