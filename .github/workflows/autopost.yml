@@ -18,7 +18,6 @@ on:
           - test-feature
           - learn
           - gen-pen-pose
-          - list-cases
       test_case_token:
         description: 'Токен кампании для теста (только для test-case)'
         required: false
@@ -142,20 +141,6 @@ jobs:
         with:
           name: pen-pose
           path: pen_pose_*.png
-
-  list-cases:
-    if: github.event.inputs.job == 'list-cases'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm ci
-      - run: npx tsx src/_listCases.ts
-        env:
-          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
 
   learn:
     if: github.event.inputs.job == 'learn'
