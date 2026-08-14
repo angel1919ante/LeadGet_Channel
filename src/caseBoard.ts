@@ -79,6 +79,7 @@ export async function renderCaseBoardCard(opts: CaseBoardOptions): Promise<Buffe
 
   .board { position:absolute; left:520px; top:210px; width:680px; height:400px; background:${PALETTE.lightCard}; border:5px solid ${PALETTE.nearBlack}; border-radius:22px; }
   .leg { position:absolute; width:16px; height:70px; background:${PALETTE.nearBlack}; border-radius:4px; top:600px; }
+  .leg::after { content:''; position:absolute; left:-9px; bottom:-6px; width:34px; height:9px; background:${PALETTE.nearBlack}; border-radius:3px; }
   .leg.l1 { left:590px; }
   .leg.l2 { left:1150px; }
 
@@ -96,7 +97,7 @@ export async function renderCaseBoardCard(opts: CaseBoardOptions): Promise<Buffe
   <img class="mascot" src="${mascotDataUri}">
 
   <div class="title">
-    <h1>${escapeHtml(opts.title)}</h1>
+    <h1>Кейс:<br>${escapeHtml(opts.title)}</h1>
     <div class="sub">${escapeHtml(opts.subtitle)}</div>
   </div>
 
