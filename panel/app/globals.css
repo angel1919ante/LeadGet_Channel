@@ -1,0 +1,191 @@
+:root {
+  --cream: #F4F1EA;
+  --card: #FBF9F4;
+  --ink: #16120D;
+  --ink-soft: #4A4339;
+  --green: #1F7A3D;
+  --green-soft: #E4EEE7;
+  --red: #B0402C;
+  --red-soft: #F5E7E2;
+  --grid: #D9D4CA;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cream: #16120D;
+    --card: #1E1912;
+    --ink: #F4F1EA;
+    --ink-soft: #B8AF9E;
+    --green: #3FA866;
+    --green-soft: #1B2B20;
+    --red: #E07A5F;
+    --red-soft: #2E1E1A;
+    --grid: #33291E;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: 'Golos Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+a { color: inherit; }
+
+.shell {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 36px;
+}
+
+.brand {
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+.brand .dot { color: var(--green); }
+
+.tabs { display: flex; gap: 4px; margin-left: auto; }
+.tab {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--ink-soft);
+}
+.tab.active { background: var(--ink); color: var(--cream); }
+
+h1 { font-size: 26px; letter-spacing: -0.01em; margin: 0 0 6px; }
+.sub { color: var(--ink-soft); font-size: 14px; margin: 0 0 28px; }
+
+.empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--ink-soft);
+  border: 1px dashed var(--grid);
+  border-radius: 16px;
+  font-size: 14px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--grid);
+  border-radius: 16px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+}
+
+.card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.pill.rating { background: var(--green-soft); color: var(--green); }
+.pill.date { background: transparent; border: 1px solid var(--grid); }
+
+.card h3 {
+  font-size: 17px;
+  margin: 0 0 8px;
+  line-height: 1.35;
+}
+.card h3 a { text-decoration: none; }
+.card h3 a:hover { text-decoration: underline; }
+
+.card p {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0 0 16px;
+}
+
+.row { display: flex; gap: 10px; align-items: center; }
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.btn:hover { opacity: 0.85; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn.approve { background: var(--green); color: white; }
+.btn.reject { background: transparent; color: var(--red); border: 1px solid var(--red-soft); }
+.btn.ghost { background: transparent; color: var(--ink-soft); border: 1px solid var(--grid); }
+
+.status {
+  font-size: 12px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+.status.pending { background: var(--grid); color: var(--ink-soft); }
+.status.approved { background: var(--green-soft); color: var(--green); }
+.status.posted { background: var(--ink); color: var(--cream); }
+.status.error, .status.rejected { background: var(--red-soft); color: var(--red); }
+.status.draft { background: var(--grid); color: var(--ink-soft); }
+
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--grid);
+}
+.plan-row:last-child { border-bottom: none; }
+.plan-date {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--ink-soft);
+  width: 78px;
+  flex-shrink: 0;
+}
+.plan-type {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: var(--green);
+  width: 66px;
+  flex-shrink: 0;
+}
+.plan-title { flex: 1; font-size: 14.5px; }
+.plan-title.empty-title { color: var(--ink-soft); font-style: italic; }
+
+.spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
