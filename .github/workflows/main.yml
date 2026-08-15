@@ -14,6 +14,7 @@ on:
           - collect
           - publish
           - get-case-tokens
+          - write-content-plan
 
 jobs:
   collect:
@@ -50,6 +51,20 @@ jobs:
           node-version: '20'
       - run: npm ci
       - run: npx tsx src/_getCaseTokens.ts
+        env:
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+
+  write-content-plan:
+    if: github.event.inputs.job == 'write-content-plan'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npx tsx src/_writeContentPlan.ts
         env:
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
