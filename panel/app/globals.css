@@ -180,6 +180,91 @@ h1 { font-size: 26px; letter-spacing: -0.01em; margin: 0 0 6px; }
 .plan-title { flex: 1; font-size: 14.5px; }
 .plan-title.empty-title { color: var(--ink-soft); font-style: italic; }
 
+.explain-card {
+  background: var(--card);
+  border: 1px solid var(--grid);
+  border-radius: 20px;
+  padding: 28px 26px;
+}
+.explain-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+.explain-text {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin: 18px 0 0;
+}
+
+.gauge-track {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--green-soft), var(--red-soft));
+  margin: 0 4px;
+}
+.gauge-fill {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  border-radius: 999px 0 0 999px;
+  background: var(--green);
+  opacity: 0.35;
+}
+.gauge-marker {
+  position: absolute;
+  top: -34px;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--cream);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 4px 9px;
+  border-radius: 8px;
+}
+.gauge-marker::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--ink);
+}
+.gauge-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 10px;
+}
+
+.trust-card {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  border-radius: 16px;
+  padding: 20px 22px;
+  margin-bottom: 12px;
+  border: 1px solid var(--grid);
+}
+.trust-card.trust-high { background: var(--green-soft); border-color: transparent; }
+.trust-card.trust-low { background: var(--red-soft); border-color: transparent; }
+.trust-card.trust-normal { background: var(--card); }
+.trust-emoji { font-size: 28px; line-height: 1; }
+.trust-body { flex: 1; }
+.trust-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.trust-source {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 700;
+  font-size: 15px;
+  text-transform: uppercase;
+}
+.trust-label { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+.trust-explain { font-size: 14px; line-height: 1.5; color: var(--ink-soft); margin: 0; }
+
 .spinner {
   width: 14px; height: 14px;
   border: 2px solid rgba(255,255,255,0.4);
