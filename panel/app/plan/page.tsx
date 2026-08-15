@@ -33,6 +33,10 @@ function parseDMY(date: string): Date | null {
   return new Date(y, m - 1, d);
 }
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, '');
+}
+
 function weekday(date: string): string {
   const dt = parseDMY(date);
   return dt ? WEEKDAYS[dt.getDay()] : '';
@@ -137,9 +141,10 @@ export default function PlanPage() {
                   )}
                 </div>
                 <Detail r={r} />
-                {r.status === 'posted' && r.post && (
-                  <p className="plan-card-post">{r.post.slice(0, 220)}{r.post.length > 220 ? '…' : ''}</p>
-                )}
+                {r.status === 'posted' && r.post && (() => {
+                  const clean = stripHtml(r.post).replace(/\s+/g, ' ').trim();
+                  return <p className="plan-card-post">{clean.slice(0, 220)}{clean.length > 220 ? '…' : ''}</p>;
+                })()}
               </div>
             </div>
           </div>
