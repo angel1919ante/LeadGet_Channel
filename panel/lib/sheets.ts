@@ -173,6 +173,21 @@ export async function getFeatureRows(): Promise<FeatureRow[]> {
   }));
 }
 
+export async function appendFeature(row: {
+  title: string;
+  problem: string;
+  description: string;
+}): Promise<void> {
+  const sheets = getClient();
+  const now = new Date().toISOString().slice(0, 10);
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: getSheetId(),
+    range: `${FEAT_SHEET}!A:E`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[now, row.title, row.problem, row.description, 'draft']] },
+  });
+}
+
 export async function setFeatureStatus(rowNumber: number, status: string): Promise<void> {
   const sheets = getClient();
   await sheets.spreadsheets.values.update({

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getFeatureRows, setFeatureStatus } from '@/lib/sheets';
+import { appendFeature, getFeatureRows, setFeatureStatus } from '@/lib/sheets';
 
 export async function GET() {
   const rows = await getFeatureRows();
@@ -7,7 +7,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { rowNumber, status } = await req.json();
-  await setFeatureStatus(rowNumber, status);
+  const body = await req.json();
+  if (body.rowNumber) {
+    await setFeatureStatus(body.rowNumber, body.status);
+  } else {
+    await appendFeature({ title: body.title, problem: body.problem, description: body.description });
+  }
   return NextResponse.json({ ok: true });
 }

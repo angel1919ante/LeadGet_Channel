@@ -14,6 +14,11 @@ interface FeatureRow {
 export default function FeaturesPage() {
   const [rows, setRows] = useState<FeatureRow[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [problem, setProblem] = useState('');
+  const [description, setDescription] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const load = () => {
     fetch('/api/features').then((r) => r.json()).then(setRows);
@@ -31,12 +36,56 @@ export default function FeaturesPage() {
     setBusy(null);
   };
 
+  const submit = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    await fetch('/api/features', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title, problem, description }),
+    });
+    setTitle('');
+    setProblem('');
+    setDescription('');
+    setFormOpen(false);
+    setSaving(false);
+    load();
+  };
+
   return (
     <>
-      <h1>Фичи</h1>
-      <p className="sub">{rows ? `${rows.length} идей` : 'Загрузка…'}</p>
+      <div className="page-head">
+        <div>
+          <h1>Фичи</h1>
+          <p className="sub">{rows ? `${rows.length} идей` : 'Загрузка…'}</p>
+        </div>
+        <button className="btn approve" onClick={() => setFormOpen((v) => !v)}>
+          {formOpen ? 'Отмена' : '+ Добавить фичу'}
+        </button>
+      </div>
 
-      {rows && rows.length === 0 && <div className="empty">Список пуст. Добавь идеи прямо в таблицу Features.</div>}
+      {formOpen && (
+        <div className="card form-card">
+          <label className="field-label">Название</label>
+          <input className="field-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Транскрибация голосовых" />
+
+          <label className="field-label">Какая была проблема</label>
+          <textarea className="field-input" rows={2} value={problem} onChange={(e) => setProblem(e.target.value)} placeholder="Клиенты присылали голосовые, бот их не понимал" />
+
+          <label className="field-label">Что сделали, как работает</label>
+          <textarea className="field-input" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Бот сам переводит голосовое в текст и отвечает по смыслу" />
+
+          <div className="row" style={{ marginTop: 4 }}>
+            <button className="btn approve" disabled={saving || !title.trim()} onClick={submit}>
+              {saving ? <span className="spinner" /> : 'Сохранить'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {rows && rows.length === 0 && !formOpen && (
+        <div className="empty">Идей пока нет — нажми «Добавить фичу» выше.</div>
+      )}
 
       {rows?.map((r) => (
         <div className="card" key={r.rowNumber}>
