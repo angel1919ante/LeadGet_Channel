@@ -186,6 +186,16 @@ h1 { font-size: 26px; letter-spacing: -0.01em; margin: 0 0 6px; }
 .status.error, .status.rejected { background: var(--red-soft); color: var(--red); }
 .status.draft { background: var(--grid); color: var(--ink-soft); }
 
+.week-header {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  margin: 28px 0 12px;
+}
+
 .plan-card {
   display: flex;
   gap: 18px;
@@ -229,6 +239,23 @@ h1 { font-size: 26px; letter-spacing: -0.01em; margin: 0 0 6px; }
 .plan-card-type { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
 .plan-card-title { font-size: 15px; font-weight: 600; }
 .plan-card-title.empty-title { color: var(--ink-soft); font-weight: 500; font-style: italic; }
+.plan-card-detail {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 8px 0 0;
+}
+.plan-card-detail strong { color: var(--ink); }
+.plan-card-post {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  background: var(--cream);
+  border: 1px solid var(--grid);
+  border-radius: 10px;
+}
 
 .explain-card {
   background: var(--card);
