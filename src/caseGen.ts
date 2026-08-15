@@ -88,7 +88,16 @@ export async function generateCase(row: ContentPlanRow): Promise<CaseGenResult> 
     fetchCampaignSummary(row.token),
   ]);
 
-  const niche = data.niche ?? info.name;
+  // Анонимизация обязательна (case-preview-spec.md, case-chat-spec.md, п.9-10):
+  // реальное имя клиента (info.name из LeadGet API) нигде не должно попасть
+  // в пост/доску/переписку — только обезличенная ниша из ContentPlan.Данные.
+  if (!data.niche) {
+    throw new Error(
+      'для кейса нужна анонимизированная "niche" в ContentPlan.Данные (JSON) — ' +
+      'без неё в пост попало бы настоящее имя клиента из LeadGet API',
+    );
+  }
+  const niche = data.niche;
   const task = data.task ?? 'лидогенерация через Telegram';
   const mechanics = data.mechanics ?? 'рассылка по целевой базе, квалификация через бот';
   const results = buildResultsString(summary, data.price);
