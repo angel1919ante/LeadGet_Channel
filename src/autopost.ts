@@ -15,9 +15,10 @@ import { callLLM } from './llm.ts';
 import { postPrompt, featurePostPrompt } from './prompts.ts';
 import { generateImageConcept, generateImage } from './imageGen.ts';
 import { formatPost } from './formatter.ts';
-import { postAsUser, sendPhotoAsUser, disconnectMTProto } from './mtproto.ts';
-import { generateCase } from './caseGen.ts';
+import { postAsUser, sendPhotoAsUser, sendAlbumAsUser, disconnectMTProto } from './mtproto.ts';
+import { generateCase, generateCaseChatSlides } from './caseGen.ts';
 import { renderCaseBoardCard } from './caseBoard.ts';
+import { renderCaseChatSlide } from './caseChat.ts';
 import { loadToneSamples } from './toneSamples.ts';
 import type { Candidate, Source } from './types.ts';
 
@@ -64,6 +65,22 @@ async function postAndRecord(
   await appendAutoPost({ postType, sourceUrl: sourceRef, imageUrl, channelPosted: channel!, status: 'success' });
   console.log(`posted [${postType}]: ${sourceRef.slice(0, 60)}`);
   return postLink(messageId);
+}
+
+// Спек: references/case-cards/case-chat-spec.md. Отдельным сообщением
+// (альбомом, без подписи) сразу после доски кейса. Best-effort: если
+// генерация/отправка упала — кейс всё равно считается опубликованным,
+// доска и текст уже ушли, тут только теряем бонусные слайды.
+async function postCaseChatSlides(niche: string, task: string, mechanics: string): Promise<void> {
+  if (!channel) return;
+  try {
+    const slides = await generateCaseChatSlides(niche, task, mechanics);
+    const images = await Promise.all(slides.map((s) => renderCaseChatSlide(s)));
+    await sendAlbumAsUser(channel, images);
+    console.log(`posted case-chat album: ${images.length} slides`);
+  } catch (e) {
+    console.error('case-chat slides failed (не критично, кейс уже опубликован):', e);
+  }
 }
 
 interface NewsResult {
@@ -135,10 +152,11 @@ async function main(): Promise<void> {
       data: process.env.TEST_CASE_DATA ?? '{}',
       status: 'approved', post: '', postUrl: '',
     };
-    const { postText, board } = await generateCase(fakeRow);
+    const { postText, board, niche, task, mechanics } = await generateCase(fakeRow);
     const formatted = await formatPost(postText);
     const boardImage = await renderCaseBoardCard(board);
     await postAndRecord('кейс', formatted, `leadget:${testToken}`, boardImage);
+    await postCaseChatSlides(niche, task, mechanics);
     return;
   }
 
@@ -188,6 +206,7 @@ async function main(): Promise<void> {
   let sourceRef: string;
   let newsRowNumber: number | undefined;
   let boardImage: Buffer | undefined;
+  let caseChatArgs: { niche: string; task: string; mechanics: string } | undefined;
 
   try {
     if (planRow.type === 'новость') {
@@ -203,10 +222,11 @@ async function main(): Promise<void> {
       newsRowNumber = news.rowNumber;
     } else if (planRow.type === 'кейс') {
       if (!planRow.token) throw new Error('для кейса нужен Токен в ContentPlan');
-      const { postText, board } = await generateCase(planRow);
+      const { postText, board, niche, task, mechanics } = await generateCase(planRow);
       rawPost = postText;
       sourceRef = `leadget:${planRow.token}`;
       boardImage = await renderCaseBoardCard(board);
+      caseChatArgs = { niche, task, mechanics };
     } else if (planRow.type === 'фича') {
       rawPost = await handleFeature(planRow);
       sourceRef = `feature:${planRow.title}`;
@@ -219,6 +239,9 @@ async function main(): Promise<void> {
     await updateContentPlanRow(planRow.rowNumber, { status: 'posted', post: formatted, postUrl });
     if (newsRowNumber !== undefined) {
       await updateRow(newsRowNumber, { status: 'posted' });
+    }
+    if (caseChatArgs) {
+      await postCaseChatSlides(caseChatArgs.niche, caseChatArgs.task, caseChatArgs.mechanics);
     }
   } catch (e) {
     console.error('autopost failed:', e);

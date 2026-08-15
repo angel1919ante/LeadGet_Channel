@@ -1,7 +1,8 @@
 import { callLLM } from './llm.ts';
-import { casePostPrompt } from './prompts.ts';
+import { casePostPrompt, caseChatPrompt } from './prompts.ts';
 import type { ContentPlanRow } from './sheets.ts';
 import type { CaseBoardNumber } from './caseBoard.ts';
+import type { CaseChatSlideOptions } from './caseChat.ts';
 
 interface CampaignInfo {
   name: string;
@@ -69,6 +70,9 @@ export interface CaseBoardData {
 export interface CaseGenResult {
   postText: string;
   board: CaseBoardData;
+  niche: string;
+  task: string;
+  mechanics: string;
 }
 
 export async function generateCase(row: ContentPlanRow): Promise<CaseGenResult> {
@@ -108,5 +112,39 @@ export async function generateCase(row: ContentPlanRow): Promise<CaseGenResult> 
     ],
   };
 
-  return { postText, board };
+  return { postText, board, niche, task, mechanics };
+}
+
+interface RawChatSlide {
+  stageTitle: string;
+  messages: Array<{ role: 'bot' | 'client'; text: string }>;
+  resultTitle: string;
+  resultCopy: string;
+}
+
+// Спек: references/case-cards/case-chat-spec.md. LLM пишет анонимизированный
+// диалог по данным кейса, caseChat.ts рендерит его детерминированно в PNG.
+export async function generateCaseChatSlides(
+  niche: string,
+  task: string,
+  mechanics: string,
+): Promise<CaseChatSlideOptions[]> {
+  const raw = await callLLM(caseChatPrompt(niche, task, mechanics));
+  const cleaned = raw.trim().replace(/^```(?:json)?\n?/, '').replace(/```$/, '').trim();
+  const parsed = JSON.parse(cleaned) as { category: string; slides: RawChatSlide[] };
+
+  if (!Array.isArray(parsed.slides) || parsed.slides.length === 0) {
+    throw new Error('caseChat: LLM вернул пустой slides');
+  }
+
+  const total = parsed.slides.length;
+  return parsed.slides.map((s, i) => ({
+    category: parsed.category,
+    stageTitle: s.stageTitle,
+    page: i + 1,
+    total,
+    messages: s.messages,
+    resultTitle: s.resultTitle,
+    resultCopy: s.resultCopy,
+  }));
 }

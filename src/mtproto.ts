@@ -46,6 +46,16 @@ export async function sendPhotoAsUser(channelId: string, photo: string | Buffer,
   return msg.id;
 }
 
+// Постит несколько фото одним альбомом (медиагруппой), без подписи —
+// используется для серии слайдов переписки кейса. Возвращает id первого сообщения группы.
+export async function sendAlbumAsUser(channelId: string, photos: Buffer[]): Promise<number> {
+  const client = await getClient();
+  const files = photos.map((buf, i) => new CustomFile(`slide${i + 1}.png`, buf.length, '', buf));
+  const result = await client.sendFile(channelId, { file: files });
+  const first = Array.isArray(result) ? result[0] : result;
+  return first.id;
+}
+
 // Читает последние N сообщений из канала. username — без @.
 export async function fetchTelegramChannel(
   username: string,
