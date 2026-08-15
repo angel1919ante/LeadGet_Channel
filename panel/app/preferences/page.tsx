@@ -222,6 +222,123 @@ function PromptStructure() {
   );
 }
 
+const IMAGE_STYLE_BY_TYPE = [
+  { type: 'Новость', emoji: '📰', note: 'Сейчас всегда без фото — идёт только текстом, фото не генерируется вообще' },
+  { type: 'Кейс', emoji: '💼', note: 'Не через ИИ-картинку — доска рисуется детерминированно (HTML/SVG, caseBoard.ts), без Flux и без Replicate' },
+  { type: 'Фича', emoji: '⚡', note: 'Industrial editorial graphic: тёплый бумажный фон, зелёный акцент, элемент-молния, blueprint-сетка' },
+];
+
+const MASCOT_TRAITS = [
+  'Всегда сидит скрестив ноги, компактная округлая поза',
+  'Чёрное худи, длинная тёмно-зелёная кепка с удлинённым козырьком',
+  'Простые нережиссёрские очки (не круглые «шутки»)',
+  'Маленькая зелёная метка бренда на худи',
+  'Ровно две руки, всегда близко к телу — никогда не стоит и не идёт',
+  'Без теней и градиентов, толстый чёрный контур, плоские заливки',
+  'Это НЕ робот',
+];
+
+const POSES = [
+  { context: 'работа / фокус / аналитика', pose: 'ноутбук на коленях, руки на клавиатуре' },
+  { context: 'telegram / мессенджер', pose: 'смартфон в обеих руках у груди' },
+  { context: 'вывод / позиция / цитата', pose: 'держит табличку-«облако» с двух рук' },
+  { context: 'разбор / инсайт', pose: 'рука у подбородка, вокруг головы простые иконки вместо фона' },
+];
+
+const PROPS = [
+  'ноутбук на коленях, без стола',
+  'смартфон в руках',
+  'табличка-облако с текстом',
+  'иконки над головой (лупа, график роста, галочка) вместо предмета в руках',
+  'воронка рядом с персонажем, не в руках',
+];
+
+const TOPIC_CONTEXTS = [
+  { topic: 'реклама/рынок', visual: 'столбчатый график, воронка, абстрактная конверсия' },
+  { topic: 'ИИ/технологии', visual: 'узлы нейросети, минимальная схема' },
+  { topic: 'telegram/мессенджеры', visual: 'облачко чата, поток сообщений' },
+  { topic: 'регуляторика', visual: 'щит, документ' },
+  { topic: 'образование', visual: 'элементы образования, выпускной' },
+  { topic: 'it/b2b', visual: 'ноутбук, код, сервер' },
+];
+
+const IMAGE_BANS = [
+  'Роботы, дроны, курьеры, «безликие IT-структуры»',
+  '3D-рендер, глянец, фотореализм людей, киберпанк',
+  'Фиолетовые/синие градиенты, неоновое свечение, UI-клише',
+  'Гигантские мультяшные лица, большие носы, балаклавы',
+  'Хаотичный/захламлённый фон, повторяющаяся кружка кофе',
+  'Одна и та же поза от поста к посту',
+  'Любой текст, логотипы, watermark, читаемые буквы/цифры на картинке',
+  'Лишние конечности — у маскота строго две руки и две ноги, никогда стоя/на ходу',
+];
+
+function ImageSpec() {
+  return (
+    <>
+      <div className="explain-title" style={{ margin: '32px 0 14px' }}>Промпты для фото</div>
+      <p className="sub" style={{ marginBottom: 20 }}>
+        Модель — flux-2-max через Replicate, 1:1, по референсам маскота из папки references/mascot.
+      </p>
+
+      <details className="spec-card spec-shared">
+        <summary>
+          <span className="spec-emoji">🖼️</span>
+          <span className="spec-title">Как это работает по типам поста</span>
+        </summary>
+        <div className="spec-block">
+          {IMAGE_STYLE_BY_TYPE.map((s) => (
+            <p className="spec-relevance" key={s.type}>
+              <strong>{s.emoji} {s.type}.</strong> {s.note}
+            </p>
+          ))}
+        </div>
+      </details>
+
+      <details className="spec-card spec-shared">
+        <summary>
+          <span className="spec-emoji">🧸</span>
+          <span className="spec-title">Маскот — фиксированная личность</span>
+          <span className="spec-volume">не меняется от поста к посту</span>
+        </summary>
+        <div className="spec-block">
+          <ul className="spec-list">{MASCOT_TRAITS.map((t, i) => <li key={i}>{t}</li>)}</ul>
+        </div>
+      </details>
+
+      <details className="spec-card spec-shared">
+        <summary>
+          <span className="spec-emoji">🧍</span>
+          <span className="spec-title">Позы и реквизит</span>
+          <span className="spec-volume">выбирается под тон поста</span>
+        </summary>
+        <div className="spec-block">
+          <div className="spec-label">Поза по контексту</div>
+          <ul className="spec-list">{POSES.map((p, i) => <li key={i}><strong>{p.context}:</strong> {p.pose}</li>)}</ul>
+        </div>
+        <div className="spec-block">
+          <div className="spec-label">Реквизит на выбор</div>
+          <ul className="spec-list">{PROPS.map((p, i) => <li key={i}>{p}</li>)}</ul>
+        </div>
+        <div className="spec-block">
+          <div className="spec-label">Визуальный контекст по теме</div>
+          <ul className="spec-list">{TOPIC_CONTEXTS.map((c, i) => <li key={i}><strong>{c.topic}:</strong> {c.visual}</li>)}</ul>
+        </div>
+      </details>
+
+      <details className="spec-card spec-shared">
+        <summary>
+          <span className="spec-emoji">🚫</span>
+          <span className="spec-title">Что запрещено на картинке</span>
+        </summary>
+        <div className="spec-block">
+          <ul className="spec-list">{IMAGE_BANS.map((b, i) => <li key={i}>{b}</li>)}</ul>
+        </div>
+      </details>
+    </>
+  );
+}
+
 const TRUST_INFO: Record<string, { emoji: string; label: string; color: string; explain: (r: PrefRow) => string }> = {
   high: {
     emoji: '🟢',
@@ -303,6 +420,7 @@ export default function PreferencesPage() {
       )}
 
       <PromptStructure />
+      <ImageSpec />
     </>
   );
 }
