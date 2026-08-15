@@ -139,6 +139,15 @@ async function main(): Promise<void> {
     return;
   }
 
+  // TEST_NEWS_TEXT: прямой пост готового текста новости без ContentPlan
+  const testNewsText = process.env.TEST_NEWS_TEXT;
+  if (testNewsText) {
+    console.log('TEST MODE: news text provided directly');
+    const formatted = await formatPost(testNewsText);
+    await postAndRecord('новость', formatted, 'test:news-direct');
+    return;
+  }
+
   // TEST_FEATURE_TITLE: прямой пост про фичу без ContentPlan
   const testFeatureTitle = process.env.TEST_FEATURE_TITLE;
   if (testFeatureTitle) {
