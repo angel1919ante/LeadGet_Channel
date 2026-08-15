@@ -72,13 +72,14 @@ export interface PlanRow {
   data: string;
   status: string;
   post: string;
+  postUrl: string;
 }
 
 export async function getPlanRows(): Promise<PlanRow[]> {
   const sheets = getClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: getSheetId(),
-    range: `${CP_SHEET}!A2:G`,
+    range: `${CP_SHEET}!A2:H`,
   });
   return (res.data.values ?? []).map((r, i) => ({
     rowNumber: i + 2,
@@ -89,6 +90,7 @@ export async function getPlanRows(): Promise<PlanRow[]> {
     data: r[4] ?? '',
     status: (r[5] ?? '').trim().toLowerCase(),
     post: r[6] ?? '',
+    postUrl: r[7] ?? '',
   }));
 }
 

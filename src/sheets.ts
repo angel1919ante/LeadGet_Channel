@@ -475,8 +475,8 @@ export async function appendAutoPost(row: {
 //                для фичи: {problem, description}
 
 const CP_SHEET = 'ContentPlan';
-const CP_HEADER = ['Дата', 'Тип', 'Заголовок', 'Токен', 'Данные', 'Статус', 'Пост'];
-const CP_COL_WIDTHS = [110, 90, 200, 260, 320, 100, 500];
+const CP_HEADER = ['Дата', 'Тип', 'Заголовок', 'Токен', 'Данные', 'Статус', 'Пост', 'Ссылка'];
+const CP_COL_WIDTHS = [110, 90, 200, 260, 320, 100, 500, 260];
 
 export interface ContentPlanRow {
   rowNumber: number;
@@ -487,6 +487,7 @@ export interface ContentPlanRow {
   data: string;     // JSON string with extra fields
   status: string;   // draft | approved | posted | error
   post: string;
+  postUrl: string;  // ссылка на опубликованный пост в Telegram
 }
 
 async function ensureSheetExists(
@@ -595,7 +596,7 @@ export async function getContentPlanRows(): Promise<ContentPlanRow[]> {
   const sheets = getClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: getSheetId(),
-    range: `${CP_SHEET}!A2:G`,
+    range: `${CP_SHEET}!A2:H`,
   });
   return (res.data.values ?? []).map((r, i) => ({
     rowNumber: i + 2,
@@ -606,12 +607,13 @@ export async function getContentPlanRows(): Promise<ContentPlanRow[]> {
     data: r[4] ?? '',
     status: (r[5] ?? '').trim().toLowerCase(),
     post: r[6] ?? '',
+    postUrl: r[7] ?? '',
   }));
 }
 
 export async function updateContentPlanRow(
   rowNumber: number,
-  patch: { title?: string; data?: string; status?: string; post?: string },
+  patch: { title?: string; data?: string; status?: string; post?: string; postUrl?: string },
 ): Promise<void> {
   const sheets = getClient();
   const ranges: sheets_v4.Schema$ValueRange[] = [];
@@ -619,6 +621,7 @@ export async function updateContentPlanRow(
   if (patch.data !== undefined) ranges.push({ range: `${CP_SHEET}!E${rowNumber}`, values: [[patch.data]] });
   if (patch.status !== undefined) ranges.push({ range: `${CP_SHEET}!F${rowNumber}`, values: [[patch.status]] });
   if (patch.post !== undefined) ranges.push({ range: `${CP_SHEET}!G${rowNumber}`, values: [[patch.post]] });
+  if (patch.postUrl !== undefined) ranges.push({ range: `${CP_SHEET}!H${rowNumber}`, values: [[patch.postUrl]] });
   if (ranges.length === 0) return;
   await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId: getSheetId(),

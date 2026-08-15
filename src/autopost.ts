@@ -30,29 +30,37 @@ function todayDMY(): string {
   return `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
 }
 
+// Ссылка на пост в Telegram: работает только для каналов с публичным @username.
+function postLink(messageId: number): string {
+  const username = channel!.replace(/^@/, '');
+  return `https://t.me/${username}/${messageId}`;
+}
+
 async function postAndRecord(
   postType: string,
   postText: string,
   sourceRef: string,
   preRenderedImage?: Buffer,
-): Promise<void> {
+): Promise<string> {
   if (!channel) throw new Error('POST_CHANNEL env var missing');
   const skipImage = process.env.SKIP_IMAGE === 'true';
   let imageUrl = '';
+  let messageId: number;
 
   if (skipImage) {
-    await postAsUser(channel, postText);
+    messageId = await postAsUser(channel, postText);
   } else if (preRenderedImage) {
-    await sendPhotoAsUser(channel, preRenderedImage, postText);
+    messageId = await sendPhotoAsUser(channel, preRenderedImage, postText);
     imageUrl = 'board';
   } else {
     const concept = await generateImageConcept(postText, postType);
     imageUrl = await generateImage(concept, postType);
-    await sendPhotoAsUser(channel, imageUrl, postText);
+    messageId = await sendPhotoAsUser(channel, imageUrl, postText);
   }
 
   await appendAutoPost({ postType, sourceUrl: sourceRef, imageUrl, channelPosted: channel!, status: 'success' });
   console.log(`posted [${postType}]: ${sourceRef.slice(0, 60)}`);
+  return postLink(messageId);
 }
 
 interface NewsResult {
@@ -122,7 +130,7 @@ async function main(): Promise<void> {
       title: process.env.TEST_CASE_TITLE ?? 'Тест',
       token: testToken,
       data: process.env.TEST_CASE_DATA ?? '{}',
-      status: 'approved', post: '',
+      status: 'approved', post: '', postUrl: '',
     };
     const { postText, board } = await generateCase(fakeRow);
     const formatted = await formatPost(postText);
@@ -143,7 +151,7 @@ async function main(): Promise<void> {
         problem: process.env.TEST_FEATURE_PROBLEM ?? '',
         description: process.env.TEST_FEATURE_DESCRIPTION ?? '',
       }),
-      status: 'approved', post: '',
+      status: 'approved', post: '', postUrl: '',
     };
     const rawPost = await handleFeature(fakeRow);
     const formatted = await formatPost(rawPost);
@@ -195,8 +203,8 @@ async function main(): Promise<void> {
     }
 
     const formatted = await formatPost(rawPost);
-    await postAndRecord(planRow.type, formatted, sourceRef, boardImage);
-    await updateContentPlanRow(planRow.rowNumber, { status: 'posted', post: formatted });
+    const postUrl = await postAndRecord(planRow.type, formatted, sourceRef, boardImage);
+    await updateContentPlanRow(planRow.rowNumber, { status: 'posted', post: formatted, postUrl });
     if (newsRowNumber !== undefined) {
       await updateRow(newsRowNumber, { status: 'posted' });
     }

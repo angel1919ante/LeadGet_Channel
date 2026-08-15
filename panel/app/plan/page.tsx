@@ -13,6 +13,7 @@ interface PlanRow {
   title: string;
   token: string;
   post: string;
+  postUrl: string;
   status: string;
   detail?: CaseDetail | FeatureDetail | NewsDetail;
 }
@@ -127,7 +128,14 @@ export default function PlanPage() {
                   <span className="plan-card-type">{info.label}</span>
                   <span className={`status ${r.status || 'draft'}`}>{r.status || 'draft'}</span>
                 </div>
-                <div className={`plan-card-title ${r.title ? '' : 'empty-title'}`}>{fallbackTitle}</div>
+                <div className="plan-card-title-row">
+                  <div className={`plan-card-title ${r.title ? '' : 'empty-title'}`}>{fallbackTitle}</div>
+                  {r.postUrl && (
+                    <a className="btn ghost open-link" href={r.postUrl} target="_blank" rel="noreferrer">
+                      Открыть
+                    </a>
+                  )}
+                </div>
                 <Detail r={r} />
                 {r.status === 'posted' && r.post && (
                   <p className="plan-card-post">{r.post.slice(0, 220)}{r.post.length > 220 ? '…' : ''}</p>

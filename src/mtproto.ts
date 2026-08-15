@@ -23,24 +23,27 @@ async function getClient(): Promise<TelegramClient> {
 
 // Постит текст в канал от имени пользователя (не бота).
 // HTML-форматирование полное: blockquote, custom emoji, bold и т.д.
-export async function postAsUser(channelId: string, htmlText: string): Promise<void> {
+// Возвращает id отправленного сообщения — нужен для ссылки на пост.
+export async function postAsUser(channelId: string, htmlText: string): Promise<number> {
   const client = await getClient();
-  await client.sendMessage(channelId, {
+  const msg = await client.sendMessage(channelId, {
     message: htmlText,
     parseMode: 'html',
   });
+  return msg.id;
 }
 
 // Постит фото + подпись в канал от имени пользователя.
 // photo — URL строкой (Replicate и т.п.) или готовый Buffer (например из caseBoard.ts).
-export async function sendPhotoAsUser(channelId: string, photo: string | Buffer, captionHtml: string): Promise<void> {
+export async function sendPhotoAsUser(channelId: string, photo: string | Buffer, captionHtml: string): Promise<number> {
   const client = await getClient();
   const file = Buffer.isBuffer(photo) ? new CustomFile('photo.png', photo.length, '', photo) : photo;
-  await client.sendFile(channelId, {
+  const msg = await client.sendFile(channelId, {
     file,
     caption: captionHtml,
     parseMode: 'html',
   });
+  return msg.id;
 }
 
 // Читает последние N сообщений из канала. username — без @.
