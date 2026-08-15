@@ -339,6 +339,74 @@ function ImageSpec() {
   );
 }
 
+interface SpecEntry {
+  name: string;
+  emoji: string;
+  title: string;
+  status: 'used' | 'unused';
+  statusNote: string;
+}
+
+const FORMAL_SPECS: SpecEntry[] = [
+  {
+    name: 'case-preview',
+    emoji: '📊',
+    title: 'Превью кейса — горизонтальная доска (1672×941)',
+    status: 'used',
+    statusNote: 'Используется — рендерится в caseBoard.ts на каждый кейс-пост',
+  },
+  {
+    name: 'case-chat',
+    emoji: '💬',
+    title: 'Слайды переписки для кейса (1254×1254, серия по 4)',
+    status: 'unused',
+    statusNote: 'НЕ используется — caseChat.ts написан, но ни один файл его не вызывает. Нужно подключить к caseGen.ts/autopost.ts, если хочешь такие слайды в постах',
+  },
+];
+
+function SpecViewer({ spec }: { spec: SpecEntry }) {
+  const [content, setContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = () => {
+    if (content || loading) return;
+    setLoading(true);
+    fetch(`/api/specs?name=${spec.name}`)
+      .then((r) => r.json())
+      .then((d) => setContent(d.content ?? 'не удалось загрузить'))
+      .finally(() => setLoading(false));
+  };
+
+  return (
+    <details className="spec-card spec-shared" onToggle={(e) => (e.currentTarget as HTMLDetailsElement).open && load()}>
+      <summary>
+        <span className="spec-emoji">{spec.emoji}</span>
+        <span className="spec-title">{spec.title}</span>
+        <span className={`status ${spec.status === 'used' ? 'approved' : 'rejected'}`}>
+          {spec.status === 'used' ? 'используется' : 'не подключено'}
+        </span>
+      </summary>
+      <div className="spec-block">
+        <p className="spec-relevance" style={{ marginBottom: 16 }}>{spec.statusNote}</p>
+        {loading && <p className="spec-relevance">Загрузка…</p>}
+        {content && <pre className="spec-raw">{content}</pre>}
+      </div>
+    </details>
+  );
+}
+
+function FormalSpecs() {
+  return (
+    <>
+      <div className="explain-title" style={{ margin: '32px 0 14px' }}>Формальные спеки — как есть, без пересказа</div>
+      <p className="sub" style={{ marginBottom: 20 }}>
+        Исходный текст документов, из которых собраны рендереры карточек. Разворачивай, чтобы увидеть точь-в-точь то, что было передано боту.
+      </p>
+      {FORMAL_SPECS.map((s) => <SpecViewer spec={s} key={s.name} />)}
+    </>
+  );
+}
+
 const TRUST_INFO: Record<string, { emoji: string; label: string; color: string; explain: (r: PrefRow) => string }> = {
   high: {
     emoji: '🟢',
@@ -421,6 +489,7 @@ export default function PreferencesPage() {
 
       <PromptStructure />
       <ImageSpec />
+      <FormalSpecs />
     </>
   );
 }

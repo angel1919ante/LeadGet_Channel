@@ -420,6 +420,23 @@ h1 { font-size: 26px; letter-spacing: -0.01em; margin: 0 0 6px; }
 .spec-relevance { font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); margin: 0 0 12px; }
 .spec-relevance strong { color: var(--ink); }
 
+.spec-raw {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  background: var(--cream);
+  border: 1px solid var(--grid);
+  border-radius: 10px;
+  padding: 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 480px;
+  overflow-y: auto;
+  overflow-x: auto;
+  margin: 0 0 20px;
+}
+
 .spinner {
   width: 14px; height: 14px;
   border: 2px solid rgba(255,255,255,0.4);
