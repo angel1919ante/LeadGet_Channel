@@ -41,6 +41,16 @@ function animateEmoji(text: string): string {
   return text;
 }
 
+// Применяет regex-замену только к частям текста, ещё не обёрнутым в <b>
+// и не являющимся URL — чтобы не сломать автоссылку и не получить
+// вложенные теги на уже выделенных кусках.
+function replaceOutsideBold(text: string, re: RegExp, replacer: (s: string) => string): string {
+  return text
+    .split(/(<b>[\s\S]*?<\/b>|https?:\/\/\S+)/g)
+    .map((chunk) => (chunk.startsWith('<b>') || chunk.startsWith('http') ? chunk : chunk.replace(re, (m) => replacer(m))))
+    .join('');
+}
+
 export async function formatPost(raw: string): Promise<string> {
   let text = raw;
 
@@ -49,11 +59,18 @@ export async function formatPost(raw: string): Promise<string> {
     `<blockquote>${inner.trim()}</blockquote>`
   );
 
-  // `цифра или текст` → <b>
+  // `цифра или текст` → <b> — то, что модель сама пометила
   text = text.replace(/`([^`]+)`/g, '<b>$1</b>');
 
   // Первая строка (заголовок) → <b>
   text = text.replace(/^(.+)$/m, '<b>$1</b>');
+
+  // Подстраховка: модель иногда забывает обернуть цифры в backtick —
+  // жирним оставшиеся числа/проценты/диапазоны, которые ещё не выделены.
+  text = replaceOutsideBold(text, /\b\d[\d\s]*(?:[-–]\d[\d\s]*)?%?\b/g, (m) => `<b>${m}</b>`);
+
+  // Ник в Telegram (@username) — тоже жирным
+  text = replaceOutsideBold(text, /@\w+/g, (m) => `<b>${m}</b>`);
 
   // Пустая строка перед каждым буллетом кроме первого
   text = text.replace(/\n(•)/g, '\n\n$1');
