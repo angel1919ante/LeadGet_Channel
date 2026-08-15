@@ -14,6 +14,7 @@ on:
           - collect
           - publish
           - backfill-post-urls
+          - debug-channel
 
 jobs:
   collect:
@@ -53,6 +54,22 @@ jobs:
         env:
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          POST_CHANNEL: '@LeadGet_reviews'
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+
+  debug-channel:
+    if: github.event.inputs.job == 'debug-channel'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npx tsx src/_debugChannel.ts
+        env:
           POST_CHANNEL: '@LeadGet_reviews'
           TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
