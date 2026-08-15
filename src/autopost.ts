@@ -43,7 +43,10 @@ async function postAndRecord(
   preRenderedImage?: Buffer,
 ): Promise<string> {
   if (!channel) throw new Error('POST_CHANNEL env var missing');
-  const skipImage = process.env.SKIP_IMAGE === 'true';
+  // Новости всегда без фото — картинка тут не несёт данных кейса/фичи,
+  // не стоит того, чтобы зависеть от Replicate. Кейсы (детерминированная
+  // доска) и фичи по-прежнему уважают SKIP_IMAGE.
+  const skipImage = postType === 'новость' || process.env.SKIP_IMAGE === 'true';
   let imageUrl = '';
   let messageId: number;
 
