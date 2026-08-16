@@ -1,6 +1,6 @@
 import {
   ensureCasesSheet, ensureContentPlanSheet, getCasesRows, appendCaseCandidate,
-  updateCaseStatus, appendContentPlanRow, getContentPlanRows,
+  updateCaseStatus, appendContentPlanRow, getContentPlanRows, pickPlanDate,
 } from './sheets.ts';
 
 const ADMIN_TOKEN = process.env.LEADGET_ADMIN_TOKEN ?? '';
@@ -29,29 +29,6 @@ interface Campaign { id: string; name: string; status: string; access_token: str
 interface Funnel { sent: number; leads: number }
 interface Summary { funnel?: Funnel }
 
-// Следующий понедельник от сегодня (или сегодня если понедельник), DD.MM.YYYY
-function nextMondayDMY(): string {
-  const d = new Date();
-  const day = d.getUTCDay(); // 0=вс, 1=пн ...
-  const daysUntilMonday = day === 1 ? 7 : (8 - day) % 7 || 7;
-  d.setUTCDate(d.getUTCDate() + daysUntilMonday);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
-}
-
-// Находим свободную дату в ContentPlan (нет кейса с любым статусом)
-function findFreeCaseDate(planDates: Set<string>): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + 1); // минимум завтра
-  for (let i = 0; i < 30; i++) {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const dmy = `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
-    if (!planDates.has(dmy)) return dmy;
-    d.setUTCDate(d.getUTCDate() + 1);
-  }
-  return nextMondayDMY();
-}
-
 async function main(): Promise<void> {
   if (!ADMIN_TOKEN) throw new Error('LEADGET_ADMIN_TOKEN env var missing');
 
@@ -60,23 +37,34 @@ async function main(): Promise<void> {
   const [existingCases, planRows] = await Promise.all([getCasesRows(), getContentPlanRows()]);
   const seenTokens = new Set(existingCases.map((r) => r.token));
 
-  // Даты в ContentPlan с кейсами (любой статус) — чтобы не ставить два кейса в один день
-  const casesPlanDates = new Set(planRows.filter((r) => r.type === 'кейс').map((r) => r.date));
+  // Копия плана, которую пополняем по ходу цикла — pickPlanDate должен видеть
+  // уже добавленные в этом же прогоне строки, иначе два кейса опять могут
+  // встать подряд друг за другом.
+  const livePlanRows = [...planRows];
 
   // ── 1. Обрабатываем "add to plan" в существующих строках Cases ──
   const toAdd = existingCases.filter((r) => r.status === 'add to plan');
   for (const c of toAdd) {
-    const date = findFreeCaseDate(casesPlanDates);
-    casesPlanDates.add(date);
+    // Анонимизация обязательна: ниша должна быть заполнена человеком и
+    // отличаться от настоящего имени клиента — иначе имя клиента попадёт
+    // в пост/доску/переписку. Без неё пропускаем и оставляем на ручной разбор.
+    const niche = c.niche.trim();
+    if (!niche || niche.toLowerCase() === c.client.trim().toLowerCase()) {
+      console.warn(`skip "${c.client}": в Cases не заполнена анонимизированная Ниша (сейчас пусто или равна имени клиента)`);
+      continue;
+    }
+
+    const date = pickPlanDate('кейс', livePlanRows, (() => { const d = new Date(); d.setUTCDate(d.getUTCDate() + 1); return d; })());
+    livePlanRows.push({ rowNumber: -1, date, type: 'кейс', title: '', token: c.token, data: '', status: 'approved', post: '', postUrl: '' });
     await appendContentPlanRow({
       date,
       type: 'кейс',
-      title: c.client,
+      title: '',
       token: c.token,
-      data: JSON.stringify({ niche: c.niche || c.client }),
+      data: JSON.stringify({ niche }),
     });
     await updateCaseStatus(c.rowNumber, 'approved');
-    console.log(`→ ContentPlan: ${c.client} на ${date}`);
+    console.log(`→ ContentPlan: кейс (${niche}) на ${date}`);
   }
 
   // ── 2. Сканируем новые кампании ──
@@ -119,7 +107,9 @@ async function main(): Promise<void> {
 
   for (const c of newCandidates) {
     console.log(`+ ${c.client}: ${c.leads} лидов (${c.conv}%)`);
-    await appendCaseCandidate({ client: c.client, token: c.token, niche: c.client, sent: c.sent, leads: c.leads, conversion: c.conv });
+    // Ниша нарочно пустая: заполняется человеком анонимизированной
+    // формулировкой перед тем как ставить "add to plan" (см. проверку выше).
+    await appendCaseCandidate({ client: c.client, token: c.token, niche: '', sent: c.sent, leads: c.leads, conversion: c.conv });
   }
 
   console.log(`обработано add-to-plan: ${toAdd.length}, новых кандидатов: ${newCandidates.length}`);

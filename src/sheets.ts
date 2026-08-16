@@ -592,6 +592,39 @@ export async function ensureContentPlanSheet(): Promise<void> {
   ]);
 }
 
+// Подбирает ближайшую свободную дату для типа поста так, чтобы один и тот же
+// тип не стоял на двух подряд идущих календарных днях — план всегда вперемешку.
+// startFrom — с какой даты начинать поиск (обычно "завтра" для планирования вперёд).
+export function pickPlanDate(type: string, planRows: ContentPlanRow[], startFrom: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const toDMY = (d: Date) => `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
+
+  const byDate = new Map<string, string>();
+  for (const r of planRows) byDate.set(r.date, r.type);
+
+  const d = new Date(startFrom);
+  let fallback: string | null = null;
+
+  for (let i = 0; i < 60; i++) {
+    const dmy = toDMY(d);
+    if (!byDate.has(dmy)) {
+      if (!fallback) fallback = dmy;
+
+      const prev = new Date(d); prev.setUTCDate(d.getUTCDate() - 1);
+      const next = new Date(d); next.setUTCDate(d.getUTCDate() + 1);
+      const prevType = byDate.get(toDMY(prev));
+      const nextType = byDate.get(toDMY(next));
+
+      if (prevType !== type && nextType !== type) return dmy;
+    }
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+
+  // Не нашли идеальный слот за 60 дней (план предельно плотный) — берём
+  // просто первую свободную дату, лучше с редким повтором, чем не запланировать вовсе.
+  return fallback ?? toDMY(d);
+}
+
 export async function getContentPlanRows(): Promise<ContentPlanRow[]> {
   const sheets = getClient();
   const res = await sheets.spreadsheets.values.get({
