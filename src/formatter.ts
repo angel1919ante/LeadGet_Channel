@@ -51,6 +51,29 @@ function replaceOutsideBold(text: string, re: RegExp, replacer: (s: string) => s
     .join('');
 }
 
+// Построчно, а не regex-цепочкой — иначе шаг "добавить пропуск перед первым
+// буллетом" срабатывает и между соседними буллетами тоже (последний символ
+// строки буллета почти всегда не '•' и не '\n', regex не отличит это от
+// обычного текста). Здесь смотрим на предыдущую СТРОКУ целиком.
+function tightenBulletSpacing(text: string): string {
+  const lines = text.split('\n');
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const isBullet = line.startsWith('•');
+    const prev = out[out.length - 1];
+    // Пропуск между двумя буллетами — убираем, только если он реально между ними
+    // (следующая непустая строка тоже буллет), иначе это законный отступ после списка.
+    if (line === '' && prev?.startsWith('•')) {
+      const next = lines[i + 1];
+      if (next?.startsWith('•')) continue;
+    }
+    if (isBullet && prev !== undefined && prev !== '' && !prev.startsWith('•')) out.push(''); // пропуск перед первым буллетом — добавляем
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
 export async function formatPost(raw: string): Promise<string> {
   let text = raw;
 
@@ -72,8 +95,13 @@ export async function formatPost(raw: string): Promise<string> {
   // Ник в Telegram (@username) — тоже жирным
   text = replaceOutsideBold(text, /@\w+/g, (m) => `<b>${m}</b>`);
 
-  // Пустая строка перед каждым буллетом кроме первого
-  text = text.replace(/\n(•)/g, '\n\n$1');
+  // Схлопываем 3+ переноса подряд до одной пустой строки — модель иногда
+  // ставит двойные отступы между абзацами.
+  text = text.replace(/\n{3,}/g, '\n\n');
+
+  // Буллеты одного списка — без пустых строк между ними; пропуск остаётся
+  // только перед первым буллетом, отделяя список от обычного текста.
+  text = tightenBulletSpacing(text);
 
   // Анимированные эмодзи
   text = animateEmoji(text);
