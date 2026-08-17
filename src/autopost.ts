@@ -128,7 +128,7 @@ async function handleFeature(planRow: ContentPlanRow): Promise<string> {
   }
   const problem = data.problem ?? '';
   const description = data.description ?? '';
-  if (!problem || !description) throw new Error('для фичи нужны поля problem и description в Данных');
+  if (!problem || !description) throw new Error('Недостаточно информации: для фичи нужны поля problem и description в Данных');
   return callLLM(featurePostPrompt(planRow.title, problem, description));
 }
 
@@ -237,7 +237,7 @@ async function main(): Promise<void> {
       sourceRef = news.link;
       newsRowNumber = news.rowNumber;
     } else if (planRow.type === 'кейс') {
-      if (!planRow.token) throw new Error('для кейса нужен Токен в ContentPlan');
+      if (!planRow.token) throw new Error('Недостаточно информации: для кейса нужен Токен в ContentPlan');
       const { postText, board, niche, task, mechanics } = await generateCase(planRow);
       rawPost = postText;
       sourceRef = `leadget:${planRow.token}`;
@@ -272,7 +272,11 @@ async function main(): Promise<void> {
     }
   } catch (e) {
     console.error('autopost failed:', e);
-    await updateContentPlanRow(planRow.rowNumber, { status: 'error' });
+    // Сохраняем причину прямо в план — панель показывает post-текст и для
+    // status=error, не нужно лезть в логи GitHub Actions, чтобы понять,
+    // почему не запостилось (обычно это "недостаточно информации: ...").
+    const reason = e instanceof Error ? e.message : String(e);
+    await updateContentPlanRow(planRow.rowNumber, { status: 'error', post: reason });
     await appendAutoPost({
       postType: planRow.type,
       sourceUrl: planRow.title,

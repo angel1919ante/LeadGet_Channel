@@ -185,6 +185,9 @@ export default function PlanPage() {
                   const clean = stripHtml(r.post).replace(/\s+/g, ' ').trim();
                   return <p className="plan-card-post">{clean.slice(0, 220)}{clean.length > 220 ? '…' : ''}</p>;
                 })()}
+                {r.status === 'error' && r.post && (
+                  <p className="plan-card-post plan-card-error">{r.post}</p>
+                )}
 
                 <div className="plan-card-actions">
                   {r.type === 'кейс' && r.status !== 'posted' && (
