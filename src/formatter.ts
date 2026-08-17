@@ -69,9 +69,30 @@ function tightenBulletSpacing(text: string): string {
       if (next?.startsWith('•')) continue;
     }
     if (isBullet && prev !== undefined && prev !== '' && !prev.startsWith('•')) out.push(''); // пропуск перед первым буллетом — добавляем
+    if (!isBullet && line !== '' && prev?.startsWith('•')) out.push(''); // и пропуск после последнего буллета — уходим из списка
     out.push(line);
   }
   return out.join('\n');
+}
+
+// Заголовок блока — короткая строка вида "⚙️ Что сделали?" / "↗️ Итоги за 14 дней:".
+// Модель их бэктиками не выделяет (это не цифра), поэтому жирним отдельно:
+// строка начинается с разрешённого эмодзи и заканчивается на ":" или "?".
+function boldSubheaders(text: string): string {
+  const emojis = Object.keys(ANIMATED);
+  return text
+    .split('\n')
+    .map((line, i) => {
+      if (i === 0) return line; // заголовок поста уже жирнится отдельно
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('•')) return line;
+      if (!emojis.some((e) => trimmed.startsWith(e))) return line;
+      if (!/[:?]$/.test(trimmed)) return line;
+      const plain = trimmed.replace(/<[^>]+>/g, '');
+      if (plain.length > 60) return line;
+      return `<b>${line.replace(/<\/?b>/g, '')}</b>`;
+    })
+    .join('\n');
 }
 
 export async function formatPost(raw: string): Promise<string> {
@@ -100,8 +121,12 @@ export async function formatPost(raw: string): Promise<string> {
   text = text.replace(/\n{3,}/g, '\n\n');
 
   // Буллеты одного списка — без пустых строк между ними; пропуск остаётся
-  // только перед первым буллетом, отделяя список от обычного текста.
+  // только перед первым буллетом и сразу после списка, отделяя его от
+  // обычного текста.
   text = tightenBulletSpacing(text);
+
+  // Подзаголовки блоков ("⚙️ Что сделали?", "↗️ Итоги за 14 дней:") — жирным.
+  text = boldSubheaders(text);
 
   // Анимированные эмодзи
   text = animateEmoji(text);
