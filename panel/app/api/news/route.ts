@@ -3,7 +3,7 @@ import { getNewsRows, setNewsStatus } from '@/lib/sheets';
 
 export async function GET() {
   const rows = await getNewsRows();
-  return NextResponse.json(rows.filter((r) => r.status === 'pending').reverse());
+  return NextResponse.json(rows.reverse());
 }
 
 export async function POST(req: Request) {
