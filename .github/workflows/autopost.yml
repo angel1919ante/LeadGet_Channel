@@ -17,7 +17,6 @@ on:
           - test-case
           - test-feature
           - test-news
-          - fix-features
           - learn
           - gen-pen-pose
       test_case_token:
@@ -154,21 +153,6 @@ jobs:
           POST_CHANNEL: '@LeadGet_reviews'
           SKIP_IMAGE: ${{ secrets.SKIP_IMAGE }}
           TEST_NEWS_TEXT: ${{ github.event.inputs.test_news_text }}
-
-
-  fix-features:
-    if: github.event.inputs.job == 'fix-features'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm ci
-      - run: npx tsx src/_fixFeatures.ts
-        env:
-          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
 
   gen-pen-pose:
     if: github.event.inputs.job == 'gen-pen-pose'
