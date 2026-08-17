@@ -42,12 +42,14 @@ async function postAndRecord(
   postText: string,
   sourceRef: string,
   preRenderedImage?: Buffer,
+  forceNoImage?: boolean,
 ): Promise<string> {
   if (!channel) throw new Error('POST_CHANNEL env var missing');
   // Новости всегда без фото — картинка тут не несёт данных кейса/фичи,
   // не стоит того, чтобы зависеть от Replicate. Кейсы (детерминированная
-  // доска) и фичи по-прежнему уважают SKIP_IMAGE.
-  const skipImage = postType === 'новость' || process.env.SKIP_IMAGE === 'true';
+  // доска) и фичи по-прежнему уважают SKIP_IMAGE, плюс кейс может явно
+  // попросить "без фото" через forceNoImage (см. data.withPhoto в плане).
+  const skipImage = postType === 'новость' || forceNoImage || process.env.SKIP_IMAGE === 'true';
   let imageUrl = '';
   let messageId: number;
 
@@ -189,15 +191,28 @@ async function main(): Promise<void> {
     return;
   }
 
-  const today = todayDMY();
-  console.log(`autopost: today=${today}`);
+  // FORCE_ROW: публикация конкретной строки плана по кнопке "Опубликовать
+  // сейчас" в панели — вне очереди, независимо от даты строки.
+  const forceRow = process.env.FORCE_ROW ? Number(process.env.FORCE_ROW) : undefined;
 
   const plans = await getContentPlanRows();
-  const planRow = plans.find((r) => r.date === today && r.status === 'approved');
+  let planRow: ContentPlanRow | undefined;
 
-  if (!planRow) {
-    console.log(`нет approved строки в ContentPlan на ${today}`);
-    return;
+  if (forceRow !== undefined) {
+    planRow = plans.find((r) => r.rowNumber === forceRow);
+    if (!planRow) {
+      console.log(`FORCE_ROW=${forceRow}: строка не найдена в ContentPlan`);
+      return;
+    }
+    console.log(`FORCE_ROW=${forceRow}: публикуем вне очереди`);
+  } else {
+    const today = todayDMY();
+    console.log(`autopost: today=${today}`);
+    planRow = plans.find((r) => r.date === today && r.status === 'approved');
+    if (!planRow) {
+      console.log(`нет approved строки в ContentPlan на ${today}`);
+      return;
+    }
   }
 
   console.log(`plan: type=${planRow.type} title="${planRow.title}"`);
@@ -207,6 +222,7 @@ async function main(): Promise<void> {
   let newsRowNumber: number | undefined;
   let boardImage: Buffer | undefined;
   let caseChatArgs: { niche: string; task: string; mechanics: string } | undefined;
+  let forceNoImage = false;
 
   try {
     if (planRow.type === 'новость') {
@@ -225,8 +241,19 @@ async function main(): Promise<void> {
       const { postText, board, niche, task, mechanics } = await generateCase(planRow);
       rawPost = postText;
       sourceRef = `leadget:${planRow.token}`;
-      boardImage = await renderCaseBoardCard(board);
-      caseChatArgs = { niche, task, mechanics };
+
+      // Переключатель "с фото / без фото" — data.withPhoto в ContentPlan.Данные,
+      // по умолчанию true. Без фото — ни доски, ни альбома переписки.
+      let planData: Record<string, unknown> = {};
+      try { planData = planRow.data ? JSON.parse(planRow.data) : {}; } catch { /* см. лог ниже по коду */ }
+      const withPhoto = planData.withPhoto !== false;
+
+      if (withPhoto) {
+        boardImage = await renderCaseBoardCard(board);
+        caseChatArgs = { niche, task, mechanics };
+      } else {
+        forceNoImage = true;
+      }
     } else if (planRow.type === 'фича') {
       rawPost = await handleFeature(planRow);
       sourceRef = `feature:${planRow.title}`;
@@ -235,7 +262,7 @@ async function main(): Promise<void> {
     }
 
     const formatted = await formatPost(rawPost);
-    const postUrl = await postAndRecord(planRow.type, formatted, sourceRef, boardImage);
+    const postUrl = await postAndRecord(planRow.type, formatted, sourceRef, boardImage, forceNoImage);
     await updateContentPlanRow(planRow.rowNumber, { status: 'posted', post: formatted, postUrl });
     if (newsRowNumber !== undefined) {
       await updateRow(newsRowNumber, { status: 'posted' });
