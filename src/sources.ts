@@ -82,36 +82,36 @@ export async function fetchCossa(): Promise<Candidate[]> {
   }
 }
 
-// Reddit r/marketing — JSON API даёт score постов, RSS не даёт
-export async function fetchReddit(): Promise<Candidate[]> {
+// vc.ru — общий firehose (нет отдельной RSS-ленты по тегам), поэтому те же
+// ключевые слова, что у Cossa, отсеивают нерелевантное до LLM-оценки.
+export async function fetchVC(): Promise<Candidate[]> {
   try {
-    const res = await fetch(
-      'https://www.reddit.com/r/marketing/top.json?t=day&limit=50',
-      { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LeadGetBot/1.0)' } },
-    );
-    if (!res.ok) return [];
-    const json = await res.json() as { data: { children: Array<{ data: { score: number; title: string; url: string; selftext: string; permalink: string } }> } };
-    return json.data.children
-      .filter((c) => c.data.score >= 50)
-      .slice(0, 15)
-      .map((c) => ({
-        source: 'reddit' as const,
-        title: c.data.title,
-        link: `https://www.reddit.com${c.data.permalink}`,
-        rating: c.data.score,
-        description: c.data.selftext.slice(0, 500),
+    const feed = await parser.parseURL('https://vc.ru/rss');
+    return feed.items
+      .filter((item) => {
+        if (!item.link) return false;
+        const text = `${item.title ?? ''} ${item.contentSnippet ?? ''}`.toLowerCase();
+        return COSSA_KEYWORDS.some((kw) => text.includes(kw));
+      })
+      .slice(0, 20)
+      .map((item) => ({
+        source: 'vc' as const,
+        title: item.title ?? '(без заголовка)',
+        link: item.link!,
+        rating: 0,
+        description: item.contentSnippet?.slice(0, 500) ?? item.content?.slice(0, 500) ?? '',
       }));
   } catch (e) {
-    console.error('reddit fetch failed:', e);
+    console.error('vc.ru fetch failed:', e);
     return [];
   }
 }
 
 export async function fetchAll(): Promise<Candidate[]> {
-  const [habr, cossa, reddit] = await Promise.all([
+  const [habr, cossa, vc] = await Promise.all([
     fetchHabr(),
     fetchCossa(),
-    fetchReddit(),
+    fetchVC(),
   ]);
-  return [...habr, ...cossa, ...reddit];
+  return [...habr, ...cossa, ...vc];
 }
