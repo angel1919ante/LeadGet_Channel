@@ -96,11 +96,12 @@ export async function getPlanRows(): Promise<PlanRow[]> {
 
 export async function setPlanRow(
   rowNumber: number,
-  patch: { title?: string; status?: string },
+  patch: { title?: string; status?: string; data?: string },
 ): Promise<void> {
   const sheets = getClient();
   const data: sheets_v4.Schema$ValueRange[] = [];
   if (patch.title !== undefined) data.push({ range: `${CP_SHEET}!C${rowNumber}`, values: [[patch.title]] });
+  if (patch.data !== undefined) data.push({ range: `${CP_SHEET}!E${rowNumber}`, values: [[patch.data]] });
   if (patch.status !== undefined) data.push({ range: `${CP_SHEET}!F${rowNumber}`, values: [[patch.status]] });
   if (data.length === 0) return;
   await sheets.spreadsheets.values.batchUpdate({

@@ -36,7 +36,19 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { rowNumber, status, title } = await req.json();
+  const { rowNumber, status, title, withPhoto } = await req.json();
+
+  if (withPhoto !== undefined) {
+    // Мержим в существующий JSON строки, чтобы не потерять niche/task/mechanics.
+    const rows = await getPlanRows();
+    const row = rows.find((r) => r.rowNumber === rowNumber);
+    let data: Record<string, unknown> = {};
+    try { data = row?.data ? JSON.parse(row.data) : {}; } catch { /* оставляем пустым, если не JSON */ }
+    data.withPhoto = withPhoto;
+    await setPlanRow(rowNumber, { data: JSON.stringify(data) });
+    return NextResponse.json({ ok: true });
+  }
+
   await setPlanRow(rowNumber, { status, title });
   return NextResponse.json({ ok: true });
 }

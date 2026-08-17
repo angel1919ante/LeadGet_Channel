@@ -12,6 +12,7 @@ interface PlanRow {
   type: string;
   title: string;
   token: string;
+  data: string;
   post: string;
   postUrl: string;
   status: string;
@@ -62,6 +63,15 @@ function weekLabel(start: Date): string {
   return `${start.getDate()} ${MONTHS[start.getMonth()]} — ${end.getDate()} ${MONTHS[end.getMonth()]}`;
 }
 
+function readWithPhoto(dataStr: string): boolean {
+  try {
+    const d = dataStr ? JSON.parse(dataStr) : {};
+    return d.withPhoto !== false;
+  } catch {
+    return true;
+  }
+}
+
 function Detail({ r }: { r: PlanRow }) {
   if (r.type === 'кейс' && r.detail && 'client' in r.detail) {
     const d = r.detail as CaseDetail;
@@ -94,10 +104,36 @@ function Detail({ r }: { r: PlanRow }) {
 
 export default function PlanPage() {
   const [rows, setRows] = useState<PlanRow[] | null>(null);
+  const [publishing, setPublishing] = useState<Record<number, 'busy' | 'queued'>>({});
 
   useEffect(() => {
     fetch('/api/plan').then((r) => r.json()).then(setRows);
   }, []);
+
+  const setWithPhoto = async (rowNumber: number, withPhoto: boolean) => {
+    setRows((prev) => (prev ?? []).map((r) => {
+      if (r.rowNumber !== rowNumber) return r;
+      let data: Record<string, unknown> = {};
+      try { data = r.data ? JSON.parse(r.data) : {}; } catch { /* пусто */ }
+      data.withPhoto = withPhoto;
+      return { ...r, data: JSON.stringify(data) };
+    }));
+    await fetch('/api/plan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rowNumber, withPhoto }),
+    });
+  };
+
+  const publishNow = async (rowNumber: number) => {
+    setPublishing((p) => ({ ...p, [rowNumber]: 'busy' }));
+    const res = await fetch('/api/plan/publish', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rowNumber }),
+    });
+    setPublishing((p) => ({ ...p, [rowNumber]: res.ok ? 'queued' : undefined as never }));
+  };
 
   return (
     <>
@@ -116,6 +152,10 @@ export default function PlanPage() {
         const start = weekStart(r.date);
         const prevStart = i > 0 ? weekStart(rows[i - 1].date) : null;
         const isNewWeek = start && (!prevStart || start.getTime() !== prevStart.getTime());
+
+        const publishState = publishing[r.rowNumber];
+        const canPublish = r.status !== 'posted' && publishState !== 'queued';
+        const withPhoto = readWithPhoto(r.data);
 
         return (
           <div key={r.rowNumber}>
@@ -145,6 +185,38 @@ export default function PlanPage() {
                   const clean = stripHtml(r.post).replace(/\s+/g, ' ').trim();
                   return <p className="plan-card-post">{clean.slice(0, 220)}{clean.length > 220 ? '…' : ''}</p>;
                 })()}
+
+                <div className="plan-card-actions">
+                  {r.type === 'кейс' && r.status !== 'posted' && (
+                    <div className="photo-toggle">
+                      <button
+                        className={`photo-toggle-btn ${withPhoto ? 'active' : ''}`}
+                        onClick={() => setWithPhoto(r.rowNumber, true)}
+                      >
+                        С фото
+                      </button>
+                      <button
+                        className={`photo-toggle-btn ${!withPhoto ? 'active' : ''}`}
+                        onClick={() => setWithPhoto(r.rowNumber, false)}
+                      >
+                        Без фото
+                      </button>
+                    </div>
+                  )}
+
+                  {canPublish && (
+                    <button
+                      className="btn approve publish-now"
+                      disabled={publishState === 'busy'}
+                      onClick={() => publishNow(r.rowNumber)}
+                    >
+                      {publishState === 'busy' ? <span className="spinner" /> : 'Опубликовать сейчас'}
+                    </button>
+                  )}
+                  {publishState === 'queued' && (
+                    <span className="publish-queued-note">Отправлено — появится в канале в течение минуты</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
