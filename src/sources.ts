@@ -3,64 +3,45 @@ import type { Candidate } from './types.ts';
 
 const parser = new Parser();
 
-// Habr RSS не содержит рейтинг — парсим со страницы статьи.
-// ponytail: regex по HTML, не тащим cheerio ради одного значения.
-async function getHabrRating(url: string): Promise<number> {
-  try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LeadGetBot/1.0)' },
-    });
-    if (!res.ok) return 0;
-    const html = await res.text();
-    const m = html.match(/tm-votes-meter__value[^>]*>\s*([+-]?\d+)/);
-    return m ? parseInt(m[1], 10) : 0;
-  } catch {
-    return 0;
-  }
-}
+// Хабы, которые реально существуют и релевантны теме канала
+const HABR_HUBS = ['artificial_intelligence', 'machine_learning'];
 
-// Хабр: только хабы, которые реально существуют
-const HABR_HUBS = [
-  { slug: 'artificial_intelligence', minRating: 30 },
-  { slug: 'machine_learning', minRating: 30 },
-];
-
+// Только AI/ML-тематика — этим уже гарантирует выбор хаба, keyword-проверка
+// тут просто подстраховка от случайных кросспостов. Бизнес-релевантность
+// (маркетинг/лидген/продажи) решает LLM-оценка в collect.ts, а не жёсткий
+// regex-фильтр здесь — иначе отсекаем всё до того, как модель успеет оценить.
+// Рейтинг статьи раньше парсили regex'ом со страницы Хабра — вёрстка
+// поменялась, regex молча возвращал 0 и резал 100% кандидатов. Скрейпинг
+// ненадёжен, поэтому просто не фильтруем по рейтингу вообще.
 export async function fetchHabr(): Promise<Candidate[]> {
   const seen = new Set<string>();
   const out: Candidate[] = [];
-  for (const hub of HABR_HUBS) {
-    const url = `https://habr.com/ru/rss/hub/${hub.slug}/all/?fl=ru`;
+  const AI_KEYWORDS = [
+    'ии', 'искусственный интеллект', 'нейросет', 'chatgpt', 'gpt',
+    'llm', 'машинное обучение', 'machine learning', 'ai-агент', 'ai агент',
+  ];
+
+  for (const slug of HABR_HUBS) {
+    const url = `https://habr.com/ru/rss/hub/${slug}/all/?fl=ru`;
     try {
       const feed = await parser.parseURL(url);
       for (const item of feed.items) {
         if (!item.link || seen.has(item.link)) continue;
         seen.add(item.link);
-        const rating = await getHabrRating(item.link);
-        if (rating < hub.minRating) continue;
-        // Нужен именно AI НА СТЫКЕ с маркетингом/рекламой/продажами —
-        // просто AI/ML-статья без бизнес-контекста не подходит.
+
         const text = `${item.title ?? ''} ${item.contentSnippet ?? ''}`.toLowerCase();
-        const AI_KEYWORDS = [
-          'ии', 'искусственный интеллект', 'нейросет', 'chatgpt', 'gpt',
-          'llm', 'машинное обучение', 'machine learning', 'ai-агент', 'ai агент',
-        ];
-        const MARKETING_KEYWORDS = [
-          'маркет', 'реклам', 'продаж', 'лид', 'telegram', 'телеграм',
-          'конверс', 'трафик', 'smm', 'таргет', 'воронк', 'клиент',
-        ];
-        const hasAI = AI_KEYWORDS.some((kw) => text.includes(kw));
-        const hasMarketing = MARKETING_KEYWORDS.some((kw) => text.includes(kw));
-        if (!hasAI || !hasMarketing) continue;
+        if (!AI_KEYWORDS.some((kw) => text.includes(kw))) continue;
+
         out.push({
           source: 'habr',
           title: item.title ?? '(без заголовка)',
           link: item.link,
-          rating,
+          rating: 0,
           description: item.contentSnippet ?? item.content ?? '',
         });
       }
     } catch (e) {
-      console.error(`habr hub ${hub.slug} fetch failed:`, e);
+      console.error(`habr hub ${slug} fetch failed:`, e);
     }
   }
   return out;
