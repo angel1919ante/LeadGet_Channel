@@ -56,6 +56,12 @@ export async function sendAlbumAsUser(channelId: string, photos: Buffer[]): Prom
   return first.id;
 }
 
+// Удаляет сообщения из канала по id (revoke: у всех, не только у себя).
+export async function deleteMessagesAsUser(channelId: string, ids: number[]): Promise<void> {
+  const client = await getClient();
+  await client.deleteMessages(channelId, ids, { revoke: true });
+}
+
 // Читает последние N сообщений из канала. username — без @.
 export async function fetchTelegramChannel(
   username: string,
