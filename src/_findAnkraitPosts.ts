@@ -10,8 +10,10 @@ async function main() {
   const client = new TelegramClient(new StringSession(session), apiId, apiHash, { connectionRetries: 3 });
   await client.connect();
 
-  await client.deleteMessages(channel, [58, 59, 60, 61], { revoke: true });
-  console.log('deleted second (overflowing) chat album (ids 58-61)');
+  const messages = await client.getMessages(channel, { limit: 8 });
+  for (const m of messages) {
+    console.log(`id=${m.id} groupedId=${m.groupedId ?? ''} media=${!!m.media} date=${m.date}`);
+  }
 
   await client.disconnect();
 }
