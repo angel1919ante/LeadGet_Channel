@@ -76,16 +76,30 @@ export interface CaseGenResult {
 }
 
 export async function generateCase(row: ContentPlanRow): Promise<CaseGenResult> {
-  let data: Record<string, string> = {};
+  let data: Record<string, string> & { summaryOverride?: Partial<CampaignSummary> } = {};
   try {
     data = row.data ? JSON.parse(row.data) : {};
   } catch {
     console.warn('ContentPlan Данные не JSON, игнорируем');
   }
 
+  // summaryOverride в Данных — ручная поправка, когда цифры из LeadGet API
+  // неполные/устаревшие (сравнено с реальным дашбордом клиента).
   const [info, summary] = await Promise.all([
-    fetchCampaignInfo(row.token),
-    fetchCampaignSummary(row.token),
+    fetchCampaignInfo(row.token).catch((e) => {
+      console.warn('campaign info fetch failed, продолжаем без имени:', e);
+      return { name: row.token };
+    }),
+    data.summaryOverride
+      ? Promise.resolve({
+          sent: data.summaryOverride.sent ?? 0,
+          read: data.summaryOverride.read ?? 0,
+          replied: data.summaryOverride.replied ?? 0,
+          engaged: data.summaryOverride.engaged ?? 0,
+          leads: data.summaryOverride.leads ?? 0,
+          disqualified: data.summaryOverride.disqualified,
+        })
+      : fetchCampaignSummary(row.token),
   ]);
 
   // Анонимизация обязательна (case-preview-spec.md, case-chat-spec.md, п.9-10):
