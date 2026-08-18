@@ -73,15 +73,17 @@ async function postAndRecord(
 // (альбомом, без подписи) сразу после доски кейса. Best-effort: если
 // генерация/отправка упала — кейс всё равно считается опубликованным,
 // доска и текст уже ушли, тут только теряем бонусные слайды.
-async function postCaseChatSlides(niche: string, task: string, mechanics: string): Promise<void> {
-  if (!channel) return;
+async function postCaseChatSlides(niche: string, task: string, mechanics: string): Promise<boolean> {
+  if (!channel) return false;
   try {
     const slides = await generateCaseChatSlides(niche, task, mechanics);
     const images = await Promise.all(slides.map((s) => renderCaseChatSlide(s)));
     await sendAlbumAsUser(channel, images);
     console.log(`posted case-chat album: ${images.length} slides`);
+    return true;
   } catch (e) {
     console.error('case-chat slides failed (не критично, кейс уже опубликован):', e);
+    return false;
   }
 }
 
@@ -223,6 +225,8 @@ async function main(): Promise<void> {
   let boardImage: Buffer | undefined;
   let caseChatArgs: { niche: string; task: string; mechanics: string } | undefined;
   let forceNoImage = false;
+  let caseData: Record<string, unknown> | undefined;
+  let caseWithPhoto = false;
 
   try {
     if (planRow.type === 'новость') {
@@ -247,6 +251,8 @@ async function main(): Promise<void> {
       let planData: Record<string, unknown> = {};
       try { planData = planRow.data ? JSON.parse(planRow.data) : {}; } catch { /* см. лог ниже по коду */ }
       const withPhoto = planData.withPhoto !== false;
+      caseData = planData;
+      caseWithPhoto = withPhoto;
 
       if (withPhoto) {
         boardImage = await renderCaseBoardCard(board);
@@ -267,8 +273,15 @@ async function main(): Promise<void> {
     if (newsRowNumber !== undefined) {
       await updateRow(newsRowNumber, { status: 'posted' });
     }
-    if (caseChatArgs) {
-      await postCaseChatSlides(caseChatArgs.niche, caseChatArgs.task, caseChatArgs.mechanics);
+    if (planRow.type === 'кейс') {
+      // Панель показывает алерт, если превью-доска/диалоги не запостились —
+      // либо withPhoto=false осознанно, либо сгенерировать/отправить не удалось.
+      const chatPosted = caseChatArgs
+        ? await postCaseChatSlides(caseChatArgs.niche, caseChatArgs.task, caseChatArgs.mechanics)
+        : false;
+      await updateContentPlanRow(planRow.rowNumber, {
+        data: JSON.stringify({ ...caseData, boardPosted: caseWithPhoto, chatPosted }),
+      });
     }
   } catch (e) {
     console.error('autopost failed:', e);

@@ -331,6 +331,12 @@ h1 { font-size: 26px; letter-spacing: -0.01em; margin: 0 0 6px; }
   color: var(--red);
   font-weight: 600;
 }
+.plan-card-alert {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red);
+  margin: 8px 0 0;
+}
 
 .explain-card {
   background: var(--card);
