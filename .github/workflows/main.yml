@@ -14,6 +14,7 @@ on:
           - collect
           - publish
           - find-ankrait-posts
+          - set-case-override
 
 jobs:
   collect:
@@ -62,6 +63,20 @@ jobs:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
           POST_CHANNEL: '@LeadGet_reviews'
+
+  set-case-override:
+    if: github.event.inputs.job == 'set-case-override'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npx tsx src/_setCaseOverride.ts
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
 
   publish:
     if: github.event.schedule == '0 15 * * *' || github.event.inputs.job == 'publish'
