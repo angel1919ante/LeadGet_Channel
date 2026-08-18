@@ -72,31 +72,31 @@ function readWithPhoto(dataStr: string): boolean {
   }
 }
 
-interface CaseAssets { withPhoto: boolean; boardPosted?: boolean; chatPosted?: boolean }
+interface CaseAssets { withPhoto: boolean; boardPosted?: boolean }
 
 function readCaseAssets(dataStr: string): CaseAssets {
   try {
     const d = dataStr ? JSON.parse(dataStr) : {};
-    return { withPhoto: d.withPhoto !== false, boardPosted: d.boardPosted, chatPosted: d.chatPosted };
+    return { withPhoto: d.withPhoto !== false, boardPosted: d.boardPosted };
   } catch {
     return { withPhoto: true };
   }
 }
 
-// Алерт про превью/диалоги — только для уже опубликованных кейсов.
-// До публикации это просто состояние переключателя "с фото/без фото",
-// не повод пугать.
+// Алерт про превью — только для уже опубликованных кейсов. До публикации
+// это просто состояние переключателя "с фото/без фото", не повод пугать.
+// Диалоги переписки не генерируются вообще (нет реального транскрипта
+// от LeadGet API — придумывать нечестно), поэтому их тут не проверяем.
 function CaseAssetsAlert({ r }: { r: PlanRow }) {
   if (r.type !== 'кейс' || r.status !== 'posted') return null;
   const a = readCaseAssets(r.data);
   if (!a.withPhoto) {
-    return <p className="plan-card-alert">⚠️ Опубликовано без превью и диалогов (выбрано "без фото")</p>;
+    return <p className="plan-card-alert">⚠️ Опубликовано без превью (выбрано "без фото")</p>;
   }
-  const missing: string[] = [];
-  if (a.boardPosted === false) missing.push('превью');
-  if (a.chatPosted === false) missing.push('диалоги');
-  if (missing.length === 0) return null;
-  return <p className="plan-card-alert">⚠️ Не запостились: {missing.join(', ')}</p>;
+  if (a.boardPosted === false) {
+    return <p className="plan-card-alert">⚠️ Превью не запостилось</p>;
+  }
+  return null;
 }
 
 function Detail({ r }: { r: PlanRow }) {
