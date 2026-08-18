@@ -11,7 +11,7 @@ function findThreshold(decided: Array<{ score: number; positive: boolean }>): nu
   let bestThreshold = 7;
   let bestAccuracy = 0;
 
-  for (let t = 5; t <= 10; t += 0.5) {
+  for (let t = 2; t <= 10; t += 0.5) {
     const correct = decided.filter(
       (d) => (d.positive && d.score >= t) || (!d.positive && d.score < t),
     ).length;
