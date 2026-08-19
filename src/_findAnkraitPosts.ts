@@ -10,11 +10,8 @@ async function main() {
   const client = new TelegramClient(new StringSession(session), apiId, apiHash, { connectionRetries: 3 });
   await client.connect();
 
-  const messages = await client.getMessages(channel, { limit: 6 });
-  for (const m of messages) {
-    const preview = (m.text ?? m.message ?? '').slice(0, 80).replace(/\n/g, ' ');
-    console.log(`id=${m.id} media=${!!m.media} date=${m.date} text="${preview}"`);
-  }
+  await client.deleteMessages(channel, [71], { revoke: true });
+  console.log('deleted post with fabricated price/comparison numbers (id=71)');
 
   await client.disconnect();
 }
