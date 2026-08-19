@@ -19,6 +19,9 @@ interface PlanRow {
   detail?: CaseDetail | FeatureDetail | NewsDetail;
 }
 
+interface AvailableCase { token: string; niche: string }
+interface AvailableFeature { title: string; problem: string; description: string }
+
 const TYPE_INFO: Record<string, { emoji: string; label: string; color: string }> = {
   новость: { emoji: '📰', label: 'Новость', color: 'type-news' },
   кейс: { emoji: '💼', label: 'Кейс', color: 'type-case' },
@@ -32,6 +35,11 @@ function parseDMY(date: string): Date | null {
   const [d, m, y] = date.split('.').map(Number);
   if (!d || !m || !y) return null;
   return new Date(y, m - 1, d);
+}
+
+function toDMY(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  return `${d}.${m}.${y}`;
 }
 
 function stripHtml(html: string): string {
@@ -83,6 +91,50 @@ function readCaseAssets(dataStr: string): CaseAssets {
   }
 }
 
+interface CaseFields {
+  niche: string; task: string; mechanics: string; price: string;
+  boardTitle: string; boardSubtitle: string;
+  overrideNumbers: boolean;
+  sent: string; read: string; replied: string; engaged: string; leads: string; disqualified: string;
+}
+
+const EMPTY_CASE_FIELDS: CaseFields = {
+  niche: '', task: '', mechanics: '', price: '', boardTitle: '', boardSubtitle: '',
+  overrideNumbers: false, sent: '', read: '', replied: '', engaged: '', leads: '', disqualified: '',
+};
+
+function readCaseFields(dataStr: string): CaseFields {
+  try {
+    const d = dataStr ? JSON.parse(dataStr) : {};
+    const o = d.summaryOverride ?? {};
+    return {
+      niche: d.niche ?? '', task: d.task ?? '', mechanics: d.mechanics ?? '', price: d.price ?? '',
+      boardTitle: d.boardTitle ?? '', boardSubtitle: d.boardSubtitle ?? '',
+      overrideNumbers: !!d.summaryOverride,
+      sent: o.sent?.toString() ?? '', read: o.read?.toString() ?? '', replied: o.replied?.toString() ?? '',
+      engaged: o.engaged?.toString() ?? '', leads: o.leads?.toString() ?? '', disqualified: o.disqualified?.toString() ?? '',
+    };
+  } catch {
+    return EMPTY_CASE_FIELDS;
+  }
+}
+
+function caseFieldsToData(f: CaseFields): Record<string, unknown> {
+  const data: Record<string, unknown> = {
+    niche: f.niche.trim(), task: f.task.trim(), mechanics: f.mechanics.trim(),
+  };
+  if (f.price.trim()) data.price = f.price.trim();
+  if (f.boardTitle.trim()) data.boardTitle = f.boardTitle.trim();
+  if (f.boardSubtitle.trim()) data.boardSubtitle = f.boardSubtitle.trim();
+  if (f.overrideNumbers) {
+    data.summaryOverride = {
+      sent: Number(f.sent) || 0, read: Number(f.read) || 0, replied: Number(f.replied) || 0,
+      engaged: Number(f.engaged) || 0, leads: Number(f.leads) || 0, disqualified: Number(f.disqualified) || 0,
+    };
+  }
+  return data;
+}
+
 // Алерт про превью — только для уже опубликованных кейсов. До публикации
 // это просто состояние переключателя "с фото/без фото", не повод пугать.
 // Диалоги переписки не генерируются вообще (нет реального транскрипта
@@ -131,11 +183,30 @@ function Detail({ r }: { r: PlanRow }) {
 
 export default function PlanPage() {
   const [rows, setRows] = useState<PlanRow[] | null>(null);
+  const [availableCases, setAvailableCases] = useState<AvailableCase[]>([]);
+  const [availableFeatures, setAvailableFeatures] = useState<AvailableFeature[]>([]);
   const [publishing, setPublishing] = useState<Record<number, 'busy' | 'queued'>>({});
+  const [deleting, setDeleting] = useState<Record<number, 'busy' | 'queued'>>({});
+  const [editingCase, setEditingCase] = useState<number | null>(null);
+  const [caseFieldsByRow, setCaseFieldsByRow] = useState<Record<number, CaseFields>>({});
+  const [savingCase, setSavingCase] = useState<number | null>(null);
 
-  useEffect(() => {
-    fetch('/api/plan').then((r) => r.json()).then(setRows);
-  }, []);
+  const [formOpen, setFormOpen] = useState(false);
+  const [newDate, setNewDate] = useState('');
+  const [newType, setNewType] = useState<'новость' | 'кейс' | 'фича'>('новость');
+  const [newToken, setNewToken] = useState('');
+  const [newFeatureTitle, setNewFeatureTitle] = useState('');
+  const [newCaseFields, setNewCaseFields] = useState<CaseFields>(EMPTY_CASE_FIELDS);
+  const [creating, setCreating] = useState(false);
+
+  const load = () => {
+    fetch('/api/plan').then((r) => r.json()).then((res) => {
+      setRows(res.rows);
+      setAvailableCases(res.availableCases ?? []);
+      setAvailableFeatures(res.availableFeatures ?? []);
+    });
+  };
+  useEffect(load, []);
 
   const setWithPhoto = async (rowNumber: number, withPhoto: boolean) => {
     setRows((prev) => (prev ?? []).map((r) => {
@@ -162,13 +233,150 @@ export default function PlanPage() {
     setPublishing((p) => ({ ...p, [rowNumber]: res.ok ? 'queued' : undefined as never }));
   };
 
+  const deletePost = async (rowNumber: number) => {
+    if (!confirm('Удалить пост из канала? Строку плана можно будет отредактировать и опубликовать заново.')) return;
+    setDeleting((p) => ({ ...p, [rowNumber]: 'busy' }));
+    const res = await fetch('/api/plan/delete', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rowNumber }),
+    });
+    setDeleting((p) => ({ ...p, [rowNumber]: res.ok ? 'queued' : undefined as never }));
+  };
+
+  const openCaseEdit = (r: PlanRow) => {
+    setCaseFieldsByRow((prev) => ({ ...prev, [r.rowNumber]: prev[r.rowNumber] ?? readCaseFields(r.data) }));
+    setEditingCase((cur) => (cur === r.rowNumber ? null : r.rowNumber));
+  };
+
+  const updateCaseField = (rowNumber: number, patch: Partial<CaseFields>) => {
+    setCaseFieldsByRow((prev) => ({ ...prev, [rowNumber]: { ...(prev[rowNumber] ?? EMPTY_CASE_FIELDS), ...patch } }));
+  };
+
+  const saveCaseFields = async (rowNumber: number) => {
+    const f = caseFieldsByRow[rowNumber];
+    if (!f || !f.niche.trim()) return;
+    setSavingCase(rowNumber);
+    await fetch('/api/plan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rowNumber, caseData: caseFieldsToData(f) }),
+    });
+    setSavingCase(null);
+    setEditingCase(null);
+    load();
+  };
+
+  const createRow = async () => {
+    if (!newDate) return;
+    let token = '';
+    let title = '';
+    let data = '{}';
+    if (newType === 'кейс') {
+      if (!newToken || !newCaseFields.niche.trim()) return;
+      token = newToken;
+      data = JSON.stringify(caseFieldsToData(newCaseFields));
+    } else if (newType === 'фича') {
+      const f = availableFeatures.find((x) => x.title === newFeatureTitle);
+      if (!f) return;
+      title = f.title;
+      data = JSON.stringify({ problem: f.problem, description: f.description });
+    }
+    setCreating(true);
+    await fetch('/api/plan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ create: true, date: toDMY(newDate), type: newType, title, token, data }),
+    });
+    setCreating(false);
+    setFormOpen(false);
+    setNewDate('');
+    setNewToken('');
+    setNewFeatureTitle('');
+    setNewCaseFields(EMPTY_CASE_FIELDS);
+    load();
+  };
+
+  const canCreate = newDate && (
+    newType === 'новость' ||
+    (newType === 'кейс' && newToken && newCaseFields.niche.trim()) ||
+    (newType === 'фича' && newFeatureTitle)
+  );
+
   return (
     <>
-      <h1>Контент-план</h1>
-      <p className="sub">{rows ? `${rows.length} постов запланировано` : 'Загрузка…'}</p>
+      <div className="page-head">
+        <div>
+          <h1>Контент-план</h1>
+          <p className="sub">{rows ? `${rows.length} постов запланировано` : 'Загрузка…'}</p>
+        </div>
+        <button className="btn approve" onClick={() => setFormOpen((v) => !v)}>
+          {formOpen ? 'Отмена' : '+ Добавить в план'}
+        </button>
+      </div>
+
+      {formOpen && (
+        <div className="card form-card">
+          <label className="field-label">Дата</label>
+          <input type="date" className="field-input" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
+
+          <label className="field-label">Тип</label>
+          <select className="field-input" value={newType} onChange={(e) => setNewType(e.target.value as typeof newType)}>
+            <option value="новость">Новость (бот сам выберет из одобренных)</option>
+            <option value="кейс">Кейс</option>
+            <option value="фича">Фича</option>
+          </select>
+
+          {newType === 'кейс' && (
+            <>
+              <label className="field-label">Кейс (из необработанных в разделе «Кейсы»)</label>
+              <select className="field-input" value={newToken} onChange={(e) => {
+                const token = e.target.value;
+                setNewToken(token);
+                const c = availableCases.find((x) => x.token === token);
+                if (c && !newCaseFields.niche) updateNewCaseNiche(c.niche);
+              }}>
+                <option value="">— выбрать —</option>
+                {availableCases.map((c) => (
+                  <option key={c.token} value={c.token}>{c.niche || c.token.slice(0, 8)}</option>
+                ))}
+              </select>
+              {availableCases.length === 0 && (
+                <p className="field-hint">Необработанных кейсов нет — новые появятся, когда сканер найдёт кампании (или добавь токен вручную).</p>
+              )}
+              {!newToken && (
+                <input className="field-input" placeholder="...или вставь токен кампании вручную" value={newToken} onChange={(e) => setNewToken(e.target.value)} />
+              )}
+              <CaseChecklist />
+              <CaseFieldsForm fields={newCaseFields} onChange={(patch) => setNewCaseFields((prev) => ({ ...prev, ...patch }))} />
+            </>
+          )}
+
+          {newType === 'фича' && (
+            <>
+              <label className="field-label">Фича (из необработанных в разделе «Фичи»)</label>
+              <select className="field-input" value={newFeatureTitle} onChange={(e) => setNewFeatureTitle(e.target.value)}>
+                <option value="">— выбрать —</option>
+                {availableFeatures.map((f) => (
+                  <option key={f.title} value={f.title}>{f.title}</option>
+                ))}
+              </select>
+              {availableFeatures.length === 0 && (
+                <p className="field-hint">Свободных фич нет — добавь новую в разделе «Фичи».</p>
+              )}
+            </>
+          )}
+
+          <div className="row" style={{ marginTop: 4 }}>
+            <button className="btn approve" disabled={creating || !canCreate} onClick={createRow}>
+              {creating ? <span className="spinner" /> : 'Добавить в план'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {rows && rows.length === 0 && (
-        <div className="empty">План пуст — новости добавляют себя сами, кейсы и фичи занеси через соответствующие разделы.</div>
+        <div className="empty">План пуст — новости добавляют себя сами, кейсы и фичи занеси через соответствующие разделы, либо жми «Добавить в план» выше.</div>
       )}
 
       {rows?.map((r, i) => {
@@ -183,6 +391,12 @@ export default function PlanPage() {
         const publishState = publishing[r.rowNumber];
         const canPublish = r.status !== 'posted' && publishState !== 'queued';
         const withPhoto = readWithPhoto(r.data);
+
+        const deleteState = deleting[r.rowNumber];
+        const canDelete = r.status === 'posted' && r.postUrl && deleteState !== 'queued';
+
+        const isEditingCase = editingCase === r.rowNumber;
+        const caseFields = caseFieldsByRow[r.rowNumber];
 
         return (
           <div key={r.rowNumber}>
@@ -235,6 +449,12 @@ export default function PlanPage() {
                     </div>
                   )}
 
+                  {r.type === 'кейс' && r.status !== 'posted' && (
+                    <button className="btn ghost" onClick={() => openCaseEdit(r)}>
+                      {isEditingCase ? 'Свернуть' : 'Данные кейса'}
+                    </button>
+                  )}
+
                   {canPublish && (
                     <button
                       className="btn approve publish-now"
@@ -247,12 +467,107 @@ export default function PlanPage() {
                   {publishState === 'queued' && (
                     <span className="publish-queued-note">Отправлено — появится в канале в течение минуты</span>
                   )}
+
+                  {canDelete && (
+                    <button
+                      className="btn reject"
+                      disabled={deleteState === 'busy'}
+                      onClick={() => deletePost(r.rowNumber)}
+                    >
+                      {deleteState === 'busy' ? <span className="spinner" /> : 'Удалить пост'}
+                    </button>
+                  )}
+                  {deleteState === 'queued' && (
+                    <span className="publish-queued-note">Удаление отправлено — обновится в течение минуты</span>
+                  )}
                 </div>
+
+                {isEditingCase && caseFields && (
+                  <div className="case-edit-card">
+                    <CaseFieldsForm fields={caseFields} onChange={(patch) => updateCaseField(r.rowNumber, patch)} />
+                    <div className="row" style={{ marginTop: 8 }}>
+                      <button className="btn approve" disabled={savingCase === r.rowNumber || !caseFields.niche.trim()} onClick={() => saveCaseFields(r.rowNumber)}>
+                        {savingCase === r.rowNumber ? <span className="spinner" /> : 'Сохранить данные кейса'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         );
       })}
+    </>
+  );
+
+  function updateNewCaseNiche(niche: string) {
+    setNewCaseFields((prev) => ({ ...prev, niche }));
+  }
+}
+
+function CaseChecklist() {
+  return (
+    <details className="case-checklist">
+      <summary>Что нужно для кейса, чек-лист</summary>
+      <ul>
+        <li>Ниша клиента обезличенно — не название компании (напр. «агентство недвижимости»)</li>
+        <li>Что искали — задача одной фразой (кого/что нужно было найти)</li>
+        <li>Как настроили — механика: рассылка, квалификация, что делал бот</li>
+        <li>Реальные цифры: если из LeadGet API верные — ничего вводить не надо; если нет — включи «переопределить цифры» и впиши вручную</li>
+        <li>Цена лида — если есть с чем сравнить (таргет/Директ), для контекста в посте</li>
+        <li>Реальная переписка с клиентом — присылай текстом отдельно, если хочешь слайды-диалог (не сочиняем)</li>
+      </ul>
+    </details>
+  );
+}
+
+function CaseFieldsForm({ fields, onChange }: { fields: CaseFields; onChange: (patch: Partial<CaseFields>) => void }) {
+  return (
+    <>
+      <label className="field-label">Ниша (обезличенно, обязательно — реальное имя клиента в пост не попадёт)</label>
+      <input className="field-input" placeholder="транспортная компания (грузоперевозки по России)" value={fields.niche} onChange={(e) => onChange({ niche: e.target.value })} />
+
+      <label className="field-label">Задача</label>
+      <input className="field-input" placeholder="поиск клиентов с грузами под конкретные машины" value={fields.task} onChange={(e) => onChange({ task: e.target.value })} />
+
+      <label className="field-label">Механика</label>
+      <input className="field-input" placeholder="рассылка по базе, квалификация через уточняющие вопросы" value={fields.mechanics} onChange={(e) => onChange({ mechanics: e.target.value })} />
+
+      <label className="field-label">Цена лида, ₽ (необязательно)</label>
+      <input className="field-input" placeholder="850" value={fields.price} onChange={(e) => onChange({ price: e.target.value })} />
+
+      <label className="field-label">Заголовок доски (необязательно, иначе — ниша)</label>
+      <input className="field-input" placeholder="транспортная компания" value={fields.boardTitle} onChange={(e) => onChange({ boardTitle: e.target.value })} />
+
+      <label className="field-label checkbox-label">
+        <input type="checkbox" checked={fields.overrideNumbers} onChange={(e) => onChange({ overrideNumbers: e.target.checked })} />
+        Переопределить цифры кампании вручную (если данные из LeadGet API неполные/устаревшие)
+      </label>
+
+      {fields.overrideNumbers && (
+        <div className="case-numbers-grid">
+          <div>
+            <label className="field-label">Отправок</label>
+            <input className="field-input" inputMode="numeric" value={fields.sent} onChange={(e) => onChange({ sent: e.target.value })} />
+          </div>
+          <div>
+            <label className="field-label">Прочитали</label>
+            <input className="field-input" inputMode="numeric" value={fields.read} onChange={(e) => onChange({ read: e.target.value })} />
+          </div>
+          <div>
+            <label className="field-label">Ответили</label>
+            <input className="field-input" inputMode="numeric" value={fields.replied} onChange={(e) => onChange({ replied: e.target.value })} />
+          </div>
+          <div>
+            <label className="field-label">Диалогов</label>
+            <input className="field-input" inputMode="numeric" value={fields.engaged} onChange={(e) => onChange({ engaged: e.target.value })} />
+          </div>
+          <div>
+            <label className="field-label">Лидов</label>
+            <input className="field-input" inputMode="numeric" value={fields.leads} onChange={(e) => onChange({ leads: e.target.value })} />
+          </div>
+        </div>
+      )}
     </>
   );
 }

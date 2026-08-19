@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCaseRows, getFeatureRows, getNewsRows, getPlanRows, setPlanRow } from '@/lib/sheets';
+import { appendPlanRow, getCaseRows, getFeatureRows, getNewsRows, getPlanRows, setPlanRow } from '@/lib/sheets';
 
 export async function GET() {
   const [rows, cases, features, news] = await Promise.all([
@@ -32,19 +32,43 @@ export async function GET() {
     return r;
   });
 
-  return NextResponse.json(enriched);
+  // Для формы "добавить в план": кейсы, ещё не одобренные под публикацию,
+  // и фичи, которые ещё не в плане и не опубликованы.
+  const plannedFeatureTitles = new Set(rows.filter((r) => r.type === 'фича').map((r) => r.title.trim().toLowerCase()));
+  const availableCases = cases
+    .filter((c) => c.status === 'pending')
+    .map((c) => ({ token: c.token, niche: c.niche }));
+  const availableFeatures = features
+    .filter((f) => f.status !== 'posted' && !plannedFeatureTitles.has(f.title.trim().toLowerCase()))
+    .map((f) => ({ title: f.title, problem: f.problem, description: f.description }));
+
+  return NextResponse.json({ rows: enriched, availableCases, availableFeatures });
 }
 
 export async function POST(req: Request) {
-  const { rowNumber, status, title, withPhoto } = await req.json();
+  const body = await req.json();
 
-  if (withPhoto !== undefined) {
-    // Мержим в существующий JSON строки, чтобы не потерять niche/task/mechanics.
+  if (body.create) {
+    await appendPlanRow({
+      date: body.date,
+      type: body.type,
+      title: body.title ?? '',
+      token: body.token ?? '',
+      data: body.data ?? '{}',
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  const { rowNumber, status, title, withPhoto, caseData } = body;
+
+  if (withPhoto !== undefined || caseData) {
+    // Мержим в существующий JSON строки, чтобы не потерять остальные поля.
     const rows = await getPlanRows();
     const row = rows.find((r) => r.rowNumber === rowNumber);
     let data: Record<string, unknown> = {};
     try { data = row?.data ? JSON.parse(row.data) : {}; } catch { /* оставляем пустым, если не JSON */ }
-    data.withPhoto = withPhoto;
+    if (withPhoto !== undefined) data.withPhoto = withPhoto;
+    if (caseData) Object.assign(data, caseData);
     await setPlanRow(rowNumber, { data: JSON.stringify(data) });
     return NextResponse.json({ ok: true });
   }

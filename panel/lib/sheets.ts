@@ -94,6 +94,22 @@ export async function getPlanRows(): Promise<PlanRow[]> {
   }));
 }
 
+export async function appendPlanRow(row: {
+  date: string;
+  type: string;
+  title: string;
+  token: string;
+  data: string;
+}): Promise<void> {
+  const sheets = getClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: getSheetId(),
+    range: `${CP_SHEET}!A:G`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[row.date, row.type, row.title, row.token, row.data, 'approved', '']] },
+  });
+}
+
 export async function setPlanRow(
   rowNumber: number,
   patch: { title?: string; status?: string; data?: string },

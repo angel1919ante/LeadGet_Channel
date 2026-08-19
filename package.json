@@ -10,7 +10,8 @@
     "autopost": "tsx src/autopost.ts",
     "init-sheets": "tsx src/initSheets.ts",
     "scan-cases": "tsx src/caseScanner.ts",
-    "learn": "tsx src/learn.ts"
+    "learn": "tsx src/learn.ts",
+    "delete-post": "tsx src/deletePost.ts"
   },
   "dependencies": {
     "googleapis": "^144.0.0",
