@@ -10,8 +10,12 @@ async function main() {
   const client = new TelegramClient(new StringSession(session), apiId, apiHash, { connectionRetries: 3 });
   await client.connect();
 
-  await client.deleteMessages(channel, [49], { revoke: true });
-  console.log('deleted case post with wrong direction (id=49)');
+  const messages = await client.getMessages(channel, { limit: 3 });
+  for (const m of messages) {
+    console.log(`id=${m.id} media=${!!m.media} date=${m.date}`);
+    console.log(`text: ${(m.text ?? m.message ?? '').slice(0, 500)}`);
+    console.log('---');
+  }
 
   await client.disconnect();
 }
