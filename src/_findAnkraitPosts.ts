@@ -10,8 +10,11 @@ async function main() {
   const client = new TelegramClient(new StringSession(session), apiId, apiHash, { connectionRetries: 3 });
   await client.connect();
 
-  await client.deleteMessages(channel, [62, 63, 64, 65, 66], { revoke: true });
-  console.log('deleted 5-slide chat album (ids 62-66)');
+  const messages = await client.getMessages(channel, { limit: 12 });
+  for (const m of messages) {
+    const preview = (m.text ?? m.message ?? '').slice(0, 60).replace(/\n/g, ' ');
+    console.log(`id=${m.id} groupedId=${m.groupedId ?? ''} media=${!!m.media} date=${m.date} text="${preview}"`);
+  }
 
   await client.disconnect();
 }

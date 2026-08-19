@@ -54,7 +54,7 @@ function buildResultsString(s: CampaignSummary, price?: string): string {
   const inner = [
     `Рассылка: \`${s.sent}\` сообщений отправлено`,
     `Прочитали: \`${s.read}\` (${pct(s.read, s.sent)}) Ответили: \`${s.replied}\` (${pct(s.replied, s.sent)})`,
-    `Квал. диалогов: \`${s.engaged}\` (${pct(s.engaged, s.sent)})`,
+    `Диалогов: \`${s.engaged}\` (${pct(s.engaged, s.sent)})`,
     `Конверсия в лид: \`${convPct}%\` — \`${s.leads}\` квалифицированных лидов`,
     ...(price ? [`\`${price} ₽\` цена квал. лида`] : []),
   ].join('\n');
