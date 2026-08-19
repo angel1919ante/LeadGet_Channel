@@ -118,7 +118,7 @@ export async function generateCase(row: ContentPlanRow): Promise<CaseGenResult> 
 
   console.log(`case: ${info.name} | sent=${summary.sent} leads=${summary.leads}`);
 
-  const rawPost = await callLLM(casePostPrompt(niche, task, mechanics));
+  const rawPost = await callLLM(casePostPrompt(niche, task, mechanics, data.marketComparison));
   // Inject results directly — LLM cannot strip [QUOTE] tags this way
   const postText = rawPost.replace('<<RESULTS>>', results);
 

@@ -92,14 +92,14 @@ function readCaseAssets(dataStr: string): CaseAssets {
 }
 
 interface CaseFields {
-  niche: string; task: string; mechanics: string; price: string;
+  niche: string; task: string; mechanics: string; price: string; marketComparison: string;
   boardTitle: string; boardSubtitle: string;
   overrideNumbers: boolean;
   sent: string; read: string; replied: string; engaged: string; leads: string; disqualified: string;
 }
 
 const EMPTY_CASE_FIELDS: CaseFields = {
-  niche: '', task: '', mechanics: '', price: '', boardTitle: '', boardSubtitle: '',
+  niche: '', task: '', mechanics: '', price: '', marketComparison: '', boardTitle: '', boardSubtitle: '',
   overrideNumbers: false, sent: '', read: '', replied: '', engaged: '', leads: '', disqualified: '',
 };
 
@@ -109,6 +109,7 @@ function readCaseFields(dataStr: string): CaseFields {
     const o = d.summaryOverride ?? {};
     return {
       niche: d.niche ?? '', task: d.task ?? '', mechanics: d.mechanics ?? '', price: d.price ?? '',
+      marketComparison: d.marketComparison ?? '',
       boardTitle: d.boardTitle ?? '', boardSubtitle: d.boardSubtitle ?? '',
       overrideNumbers: !!d.summaryOverride,
       sent: o.sent?.toString() ?? '', read: o.read?.toString() ?? '', replied: o.replied?.toString() ?? '',
@@ -124,6 +125,7 @@ function caseFieldsToData(f: CaseFields): Record<string, unknown> {
     niche: f.niche.trim(), task: f.task.trim(), mechanics: f.mechanics.trim(),
   };
   if (f.price.trim()) data.price = f.price.trim();
+  if (f.marketComparison.trim()) data.marketComparison = f.marketComparison.trim();
   if (f.boardTitle.trim()) data.boardTitle = f.boardTitle.trim();
   if (f.boardSubtitle.trim()) data.boardSubtitle = f.boardSubtitle.trim();
   if (f.overrideNumbers) {
@@ -513,8 +515,9 @@ function CaseChecklist() {
         <li>Ниша клиента обезличенно — не название компании (напр. «агентство недвижимости»)</li>
         <li>Что искали — задача одной фразой (кого/что нужно было найти)</li>
         <li>Как настроили — механика: рассылка, квалификация, что делал бот</li>
-        <li>Реальные цифры: если из LeadGet API верные — ничего вводить не надо; если нет — включи «переопределить цифры» и впиши вручную</li>
-        <li>Цена лида — если есть с чем сравнить (таргет/Директ), для контекста в посте</li>
+        <li>Количество контактов (отправок) — если из LeadGet API неверное, включи «переопределить цифры» и впиши своё</li>
+        <li>Конверсия — сколько из отправок дошло до диалога и до лида (те же ручные цифры, если API врёт)</li>
+        <li>Цена лида и с чем сравнить (таргет/Директ) — только если реально знаешь цифру, не для красоты</li>
         <li>Реальная переписка с клиентом — присылай текстом отдельно, если хочешь слайды-диалог (не сочиняем)</li>
       </ul>
     </details>
@@ -535,6 +538,9 @@ function CaseFieldsForm({ fields, onChange }: { fields: CaseFields; onChange: (p
 
       <label className="field-label">Цена лида, ₽ (необязательно)</label>
       <input className="field-input" placeholder="850" value={fields.price} onChange={(e) => onChange({ price: e.target.value })} />
+
+      <label className="field-label">Сравнение с рынком (необязательно — только если реально знаешь цифру, не для красоты)</label>
+      <input className="field-input" placeholder="таргет и Директ в нише: от 2500 ₽ за контакт" value={fields.marketComparison} onChange={(e) => onChange({ marketComparison: e.target.value })} />
 
       <label className="field-label">Заголовок доски (необязательно, иначе — ниша)</label>
       <input className="field-input" placeholder="транспортная компания" value={fields.boardTitle} onChange={(e) => onChange({ boardTitle: e.target.value })} />
