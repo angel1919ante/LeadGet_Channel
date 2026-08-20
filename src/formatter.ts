@@ -41,25 +41,27 @@ function animateEmoji(text: string): string {
   return text.replace(pattern, (m) => `<tg-emoji emoji-id="${ANIMATED[m]}">${m}</tg-emoji>`);
 }
 
-// Применяет regex-замену только к частям текста, ещё не обёрнутым в <b>,
-// не являющимся URL, и не проценту в скобках вида "(78.5%)" — по эталону
-// это вспомогательное число рядом с жирным, само остаётся обычным
-// текстом. Иначе получаем вложенные теги / раздробленный "78" "." "5" "%".
+// Применяет regex-замену только к частям текста, ещё не обёрнутым в <b>
+// или <code>, не являющимся URL, и не проценту в скобках вида "(78.5%)" —
+// по эталону это вспомогательное число рядом с жирным/моноширинным, само
+// остаётся обычным текстом. Иначе получаем вложенные теги / раздробленный
+// "78" "." "5" "%".
 function replaceOutsideBold(text: string, re: RegExp, replacer: (s: string) => string): string {
   return text
-    .split(/(<b>[\s\S]*?<\/b>|https?:\/\/\S+|\([\d.,]+%\))/g)
-    .map((chunk) => (chunk.startsWith('<b>') || chunk.startsWith('http') || /^\([\d.,]+%\)$/.test(chunk) ? chunk : chunk.replace(re, (m) => replacer(m))))
+    .split(/(<b>[\s\S]*?<\/b>|<code>[\s\S]*?<\/code>|https?:\/\/\S+|\([\d.,]+%\))/g)
+    .map((chunk) => (chunk.startsWith('<b>') || chunk.startsWith('<code>') || chunk.startsWith('http') || /^\([\d.,]+%\)$/.test(chunk) ? chunk : chunk.replace(re, (m) => replacer(m))))
     .join('');
 }
 
 // Эталон форматирования (зафиксирован пользователем): пропуск между КАЖДОЙ
 // парой соседних непустых строк — буллеты в том числе, они такой же
-// самостоятельный абзац, как и обычный текст. Содержимое <blockquote> не
-// трогаем — строки цифр там нарочно идут без пропусков.
+// самостоятельный абзац, как и обычный текст. Содержимое <blockquote> и
+// [STACK]...[/STACK] (статистика кейса — caseGen.ts) не трогаем: строки
+// цифр там нарочно идут пачкой, без пропусков.
 function enforceParagraphBreaks(text: string): string {
   return text
-    .split(/(<blockquote>[\s\S]*?<\/blockquote>)/g)
-    .map((chunk) => (chunk.startsWith('<blockquote>') ? chunk : addMissingBreaks(chunk)))
+    .split(/(<blockquote>[\s\S]*?<\/blockquote>|\[STACK\][\s\S]*?\[\/STACK\])/g)
+    .map((chunk) => (chunk.startsWith('<blockquote>') || chunk.startsWith('[STACK]') ? chunk : addMissingBreaks(chunk)))
     .join('');
 }
 
@@ -123,6 +125,10 @@ export async function formatPost(raw: string): Promise<string> {
 
   // Пропуск между каждой парой соседних непустых строк (включая буллеты).
   text = enforceParagraphBreaks(text);
+
+  // [STACK]...[/STACK] защитил статистику кейса от пропусков выше — снимаем
+  // служебные маркеры, сам текст остаётся как есть (без блок-цитаты).
+  text = text.replace(/\[STACK\]([\s\S]*?)\[\/STACK\]/g, (_, inner) => inner.trim());
 
   // Подзаголовки блоков ("⚙️ Что сделали?", "↗️ Итоги за 14 дней:") — жирным.
   text = boldSubheaders(text);

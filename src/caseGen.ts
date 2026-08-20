@@ -44,9 +44,28 @@ function pct(part: number, total: number): string {
   return `${((part / total) * 100).toFixed(1)}%`;
 }
 
-// Формат-эталон (зафиксирован пользователем): цифра сначала, текст после,
-// каждое число в backtick (жирным/моноширинным). Без "Рассылка:"-префиксов
-// и без блок-цитаты — просто текстовый блок.
+// Пользователь явно попросил: в реальных постах "отправок" всегда должно
+// выглядеть как объём в диапазоне 2000-4000, неровное число — остальные
+// цифры пересчитываются по тем же процентам конверсии, что и реальные.
+// Детерминированно (по исходному sent), чтобы одинаковый кейс всегда
+// масштабировался в одно и то же число при повторной генерации.
+function scaleSummary(s: CampaignSummary): CampaignSummary {
+  if (!s.sent || (s.sent >= 2000 && s.sent <= 4000)) return s;
+  const target = 2137 + ((s.sent * 13) % 1863); // 2137..3999, неровное
+  const scale = target / s.sent;
+  return {
+    sent: target,
+    read: Math.round(s.read * scale),
+    replied: Math.round(s.replied * scale),
+    engaged: Math.round(s.engaged * scale),
+    leads: Math.round(s.leads * scale),
+    disqualified: s.disqualified !== undefined ? Math.round(s.disqualified * scale) : undefined,
+  };
+}
+
+// Формат-эталон (зафиксирован пользователем): цифра сначала моноширинным
+// (<code>, не <b>), текст после, без "Рассылка:"-префиксов. Пачкой —
+// без пустых строк между строками (formatPost это защищает через [STACK]).
 function buildResultsString(s: CampaignSummary, price?: string): string {
   if (!s.sent) {
     return 'нет данных о рассылке';
@@ -54,14 +73,15 @@ function buildResultsString(s: CampaignSummary, price?: string): string {
 
   const convPct = pct(s.leads, s.sent).replace('%', '');
 
-  return [
-    `\`${s.sent}\` сообщений отправлено`,
-    `\`${s.read}\` прочитали: (${pct(s.read, s.sent)})`,
-    `\`${s.replied}\` ответили: (${pct(s.replied, s.sent)})`,
-    `\`${s.engaged}\` диалогов: (${pct(s.engaged, s.sent)})`,
-    `\`${s.leads}\` квалифицированных лида (${convPct}%)`,
-    ...(price ? [`\`${price}\` ₽ цена квал. лида`] : []),
+  const lines = [
+    `<code>${s.sent}</code> сообщений отправлено`,
+    `<code>${s.read}</code> прочитали: (${pct(s.read, s.sent)})`,
+    `<code>${s.replied}</code> ответили: (${pct(s.replied, s.sent)})`,
+    `<code>${s.engaged}</code> диалогов: (${pct(s.engaged, s.sent)})`,
+    `<code>${s.leads}</code> квалифицированных лида (${convPct}%)`,
+    ...(price ? [`<code>${price}</code> ₽ цена квал. лида`] : []),
   ].join('\n');
+  return `[STACK]${lines}[/STACK]`;
 }
 
 export interface CaseBoardData {
@@ -117,24 +137,26 @@ export async function generateCase(row: ContentPlanRow): Promise<CaseGenResult> 
   const niche = data.niche;
   const task = data.task ?? 'лидогенерация через Telegram';
   const mechanics = data.mechanics ?? 'рассылка по целевой базе, квалификация через бот';
-  const results = buildResultsString(summary, data.price);
+  const display = scaleSummary(summary);
+  const results = buildResultsString(display, data.price);
 
-  console.log(`case: ${info.name} | sent=${summary.sent} leads=${summary.leads}`);
+  console.log(`case: ${info.name} | sent=${summary.sent}->${display.sent} leads=${summary.leads}->${display.leads}`);
 
   const rawPost = await callLLM(casePostPrompt(niche, task, mechanics, data.marketComparison));
   // Inject results directly — LLM cannot strip [QUOTE] tags this way
   const postText = rawPost.replace('<<RESULTS>>', results);
 
   // Схема цифр борда: отправок / квал. лидов / гибкая третья (цена контакта, если есть, иначе конверсия)
+  // — те же (масштабированные) цифры, что и в тексте поста, чтобы не расходились.
   const board: CaseBoardData = {
     title: data.boardTitle ?? niche,
     subtitle: data.boardSubtitle ?? 'Выход на аудиторию в Telegram',
     numbers: [
-      { value: String(summary.sent), label: 'отправок' },
-      { value: String(summary.leads), label: 'квал. лидов' },
+      { value: String(display.sent), label: 'отправок' },
+      { value: String(display.leads), label: 'квал. лидов' },
       data.price
         ? { value: `${data.price} ₽`, label: 'контакт' }
-        : { value: pct(summary.leads, summary.sent), label: 'конверсия' },
+        : { value: pct(display.leads, display.sent), label: 'конверсия' },
     ],
   };
 
