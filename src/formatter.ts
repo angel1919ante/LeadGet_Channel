@@ -31,14 +31,14 @@ const ANIMATED: Record<string, string> = {
   '💯': '5341498088408234504',
 };
 
-// Заменяем emoji → <tg-emoji emoji-id="...">emoji</tg-emoji>
-// Длинные (многокодовые) первыми, чтобы не было частичного совпадения.
+// Заменяем emoji → <tg-emoji emoji-id="...">emoji</tg-emoji>.
+// Один regex-проход, не цепочка split/join — иначе '⚡' внутри уже
+// обёрнутого '⚡️' обрачивается второй раз (вложенные теги). Длинные
+// (многокодовые) идут первыми в альтернации, чтобы совпадали раньше.
 function animateEmoji(text: string): string {
   const entries = Object.entries(ANIMATED).sort((a, b) => b[0].length - a[0].length);
-  for (const [emoji, id] of entries) {
-    text = text.split(emoji).join(`<tg-emoji emoji-id="${id}">${emoji}</tg-emoji>`);
-  }
-  return text;
+  const pattern = new RegExp(entries.map(([e]) => e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+  return text.replace(pattern, (m) => `<tg-emoji emoji-id="${ANIMATED[m]}">${m}</tg-emoji>`);
 }
 
 // Применяет regex-замену только к частям текста, ещё не обёрнутым в <b>
@@ -70,6 +70,24 @@ function tightenBulletSpacing(text: string): string {
     }
     if (isBullet && prev !== undefined && prev !== '' && !prev.startsWith('•')) out.push(''); // пропуск перед первым буллетом — добавляем
     if (!isBullet && line !== '' && prev?.startsWith('•')) out.push(''); // и пропуск после последнего буллета — уходим из списка
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+// Модель иногда забывает пустую строку между двумя соседними абзацами
+// (COMMON_BANS требует ровно один абзац на блок — переносов внутри блока
+// быть не должно, значит любой "голый" \n между двумя непустыми
+// не-буллет строками — это пропущенный разрыв абзаца, а не намеренный).
+// Буллеты не трогаем — они соседствуют друг с другом намеренно.
+function enforceParagraphBreaks(text: string): string {
+  const lines = text.split('\n');
+  const out: string[] = [];
+  for (const line of lines) {
+    const prev = out[out.length - 1];
+    if (line !== '' && prev !== undefined && prev !== '' && !line.startsWith('•') && !prev.startsWith('•')) {
+      out.push('');
+    }
     out.push(line);
   }
   return out.join('\n');
@@ -119,6 +137,10 @@ export async function formatPost(raw: string): Promise<string> {
   // Схлопываем 3+ переноса подряд до одной пустой строки — модель иногда
   // ставит двойные отступы между абзацами.
   text = text.replace(/\n{3,}/g, '\n\n');
+
+  // Пропущенный разрыв абзаца — до того, как трогаем буллеты, чтобы не
+  // спутать список с обычным текстом.
+  text = enforceParagraphBreaks(text);
 
   // Буллеты одного списка — без пустых строк между ними; пропуск остаётся
   // только перед первым буллетом и сразу после списка, отделяя его от
