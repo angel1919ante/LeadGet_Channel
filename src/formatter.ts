@@ -79,8 +79,17 @@ function tightenBulletSpacing(text: string): string {
 // (COMMON_BANS требует ровно один абзац на блок — переносов внутри блока
 // быть не должно, значит любой "голый" \n между двумя непустыми
 // не-буллет строками — это пропущенный разрыв абзаца, а не намеренный).
-// Буллеты не трогаем — они соседствуют друг с другом намеренно.
+// Буллеты не трогаем — они соседствуют друг с другом намеренно. Содержимое
+// <blockquote> тоже не трогаем — строки цифр там нарочно идут без пропусков
+// (buildResultsString в caseGen.ts), это не абзацы.
 function enforceParagraphBreaks(text: string): string {
+  return text
+    .split(/(<blockquote>[\s\S]*?<\/blockquote>)/g)
+    .map((chunk) => (chunk.startsWith('<blockquote>') ? chunk : addMissingBreaks(chunk)))
+    .join('');
+}
+
+function addMissingBreaks(text: string): string {
   const lines = text.split('\n');
   const out: string[] = [];
   for (const line of lines) {
