@@ -41,47 +41,21 @@ function animateEmoji(text: string): string {
   return text.replace(pattern, (m) => `<tg-emoji emoji-id="${ANIMATED[m]}">${m}</tg-emoji>`);
 }
 
-// Применяет regex-замену только к частям текста, ещё не обёрнутым в <b>
-// и не являющимся URL — чтобы не сломать автоссылку и не получить
-// вложенные теги на уже выделенных кусках.
+// Применяет regex-замену только к частям текста, ещё не обёрнутым в <b>,
+// не являющимся URL, и не проценту в скобках вида "(78.5%)" — по эталону
+// это вспомогательное число рядом с жирным, само остаётся обычным
+// текстом. Иначе получаем вложенные теги / раздробленный "78" "." "5" "%".
 function replaceOutsideBold(text: string, re: RegExp, replacer: (s: string) => string): string {
   return text
-    .split(/(<b>[\s\S]*?<\/b>|https?:\/\/\S+)/g)
-    .map((chunk) => (chunk.startsWith('<b>') || chunk.startsWith('http') ? chunk : chunk.replace(re, (m) => replacer(m))))
+    .split(/(<b>[\s\S]*?<\/b>|https?:\/\/\S+|\([\d.,]+%\))/g)
+    .map((chunk) => (chunk.startsWith('<b>') || chunk.startsWith('http') || /^\([\d.,]+%\)$/.test(chunk) ? chunk : chunk.replace(re, (m) => replacer(m))))
     .join('');
 }
 
-// Построчно, а не regex-цепочкой — иначе шаг "добавить пропуск перед первым
-// буллетом" срабатывает и между соседними буллетами тоже (последний символ
-// строки буллета почти всегда не '•' и не '\n', regex не отличит это от
-// обычного текста). Здесь смотрим на предыдущую СТРОКУ целиком.
-function tightenBulletSpacing(text: string): string {
-  const lines = text.split('\n');
-  const out: string[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const isBullet = line.startsWith('•');
-    const prev = out[out.length - 1];
-    // Пропуск между двумя буллетами — убираем, только если он реально между ними
-    // (следующая непустая строка тоже буллет), иначе это законный отступ после списка.
-    if (line === '' && prev?.startsWith('•')) {
-      const next = lines[i + 1];
-      if (next?.startsWith('•')) continue;
-    }
-    if (isBullet && prev !== undefined && prev !== '' && !prev.startsWith('•')) out.push(''); // пропуск перед первым буллетом — добавляем
-    if (!isBullet && line !== '' && prev?.startsWith('•')) out.push(''); // и пропуск после последнего буллета — уходим из списка
-    out.push(line);
-  }
-  return out.join('\n');
-}
-
-// Модель иногда забывает пустую строку между двумя соседними абзацами
-// (COMMON_BANS требует ровно один абзац на блок — переносов внутри блока
-// быть не должно, значит любой "голый" \n между двумя непустыми
-// не-буллет строками — это пропущенный разрыв абзаца, а не намеренный).
-// Буллеты не трогаем — они соседствуют друг с другом намеренно. Содержимое
-// <blockquote> тоже не трогаем — строки цифр там нарочно идут без пропусков
-// (buildResultsString в caseGen.ts), это не абзацы.
+// Эталон форматирования (зафиксирован пользователем): пропуск между КАЖДОЙ
+// парой соседних непустых строк — буллеты в том числе, они такой же
+// самостоятельный абзац, как и обычный текст. Содержимое <blockquote> не
+// трогаем — строки цифр там нарочно идут без пропусков.
 function enforceParagraphBreaks(text: string): string {
   return text
     .split(/(<blockquote>[\s\S]*?<\/blockquote>)/g)
@@ -94,7 +68,7 @@ function addMissingBreaks(text: string): string {
   const out: string[] = [];
   for (const line of lines) {
     const prev = out[out.length - 1];
-    if (line !== '' && prev !== undefined && prev !== '' && !line.startsWith('•') && !prev.startsWith('•')) {
+    if (line !== '' && prev !== undefined && prev !== '') {
       out.push('');
     }
     out.push(line);
@@ -147,14 +121,8 @@ export async function formatPost(raw: string): Promise<string> {
   // ставит двойные отступы между абзацами.
   text = text.replace(/\n{3,}/g, '\n\n');
 
-  // Пропущенный разрыв абзаца — до того, как трогаем буллеты, чтобы не
-  // спутать список с обычным текстом.
+  // Пропуск между каждой парой соседних непустых строк (включая буллеты).
   text = enforceParagraphBreaks(text);
-
-  // Буллеты одного списка — без пустых строк между ними; пропуск остаётся
-  // только перед первым буллетом и сразу после списка, отделяя его от
-  // обычного текста.
-  text = tightenBulletSpacing(text);
 
   // Подзаголовки блоков ("⚙️ Что сделали?", "↗️ Итоги за 14 дней:") — жирным.
   text = boldSubheaders(text);

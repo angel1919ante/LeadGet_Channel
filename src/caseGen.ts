@@ -44,6 +44,9 @@ function pct(part: number, total: number): string {
   return `${((part / total) * 100).toFixed(1)}%`;
 }
 
+// Формат-эталон (зафиксирован пользователем): цифра сначала, текст после,
+// каждое число в backtick (жирным/моноширинным). Без "Рассылка:"-префиксов
+// и без блок-цитаты — просто текстовый блок.
 function buildResultsString(s: CampaignSummary, price?: string): string {
   if (!s.sent) {
     return 'нет данных о рассылке';
@@ -51,14 +54,14 @@ function buildResultsString(s: CampaignSummary, price?: string): string {
 
   const convPct = pct(s.leads, s.sent).replace('%', '');
 
-  const inner = [
-    `Рассылка: \`${s.sent}\` сообщений отправлено`,
-    `Прочитали: \`${s.read}\` (${pct(s.read, s.sent)}) Ответили: \`${s.replied}\` (${pct(s.replied, s.sent)})`,
-    `Диалогов: \`${s.engaged}\` (${pct(s.engaged, s.sent)})`,
-    `Конверсия в лид: \`${convPct}%\` — \`${s.leads}\` квалифицированных лидов`,
-    ...(price ? [`\`${price} ₽\` цена квал. лида`] : []),
+  return [
+    `\`${s.sent}\` сообщений отправлено`,
+    `\`${s.read}\` прочитали: (${pct(s.read, s.sent)})`,
+    `\`${s.replied}\` ответили: (${pct(s.replied, s.sent)})`,
+    `\`${s.engaged}\` диалогов: (${pct(s.engaged, s.sent)})`,
+    `\`${s.leads}\` квалифицированных лида (${convPct}%)`,
+    ...(price ? [`\`${price}\` ₽ цена квал. лида`] : []),
   ].join('\n');
-  return `[QUOTE]${inner}[/QUOTE]`;
 }
 
 export interface CaseBoardData {
