@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { appendPlanRow, getCaseRows, getFeatureRows, getPlanRows } from '@/lib/sheets';
 
-const POSTS_PER_WEEK = 3;
+// Фиксированные дни недели под посты: Пн, Ср, Пт, Вс — равномерно, всегда одни и те же.
+const WEEK_OFFSETS = [0, 2, 4, 6];
 
 function parseDMY(date: string): Date | null {
   const [d, m, y] = date.split('.').map(Number);
@@ -23,30 +24,14 @@ function mondayOf(d: Date): Date {
   return r;
 }
 
-// Первый день недели без коллизии по типу с соседними днями (в пределах
-// уже существующего плана + того, что уже выбрано в этом же прогоне).
-// Если идеального дня в неделе нет — берём первый вообще свободный.
-function pickDateInWeek(type: string, planRows: Array<{ date: string; type: string }>, weekMonday: Date): string | null {
-  const byDate = new Map(planRows.map((r) => [r.date, r.type]));
-  const candidate = (offset: number) => {
-    const d = new Date(weekMonday);
-    d.setDate(weekMonday.getDate() + offset);
-    return d;
-  };
-  for (let i = 0; i < 7; i++) {
-    const d = candidate(i);
-    const dateStr = toDMY(d);
-    if (byDate.has(dateStr)) continue;
-    const prev = new Date(d); prev.setDate(d.getDate() - 1);
-    const next = new Date(d); next.setDate(d.getDate() + 1);
-    if (byDate.get(toDMY(prev)) === type || byDate.get(toDMY(next)) === type) continue;
-    return dateStr;
-  }
-  for (let i = 0; i < 7; i++) {
-    const dateStr = toDMY(candidate(i));
-    if (!byDate.has(dateStr)) return dateStr;
-  }
-  return null; // неделя уже полностью занята
+// Раскладывает до 2 "особых" типов (кейс/фича) по слотам так, чтобы они не
+// стояли соседними слотами друг с другом или с одинаковыми новостями рядом.
+// Остальные слоты — новости.
+function placeTypes(special: string[]): string[] {
+  const slots = ['новость', 'новость', 'новость', 'новость'];
+  const positions = special.length === 1 ? [1] : [0, 2];
+  special.forEach((t, i) => { slots[positions[i]] = t; });
+  return slots;
 }
 
 export async function POST() {
@@ -73,35 +58,53 @@ export async function POST() {
   const availableCases = cases.filter((c) => c.status === 'pending' && !plannedCaseTokens.has(c.token));
   const availableFeatures = features.filter((f) => f.status !== 'posted' && !plannedFeatureTitles.has(f.title.trim().toLowerCase()));
 
-  // Миксуем: сначала реальные кейс/фича (если есть — по одному), остальное новостями.
-  const slots: Array<{ type: 'кейс' | 'фича' | 'новость'; token?: string; title?: string; data: string }> = [];
-  if (availableCases.length > 0) {
-    slots.push({ type: 'кейс', token: availableCases[0].token, data: '{}' });
-  }
-  if (availableFeatures.length > 0) {
-    const f = availableFeatures[0];
-    slots.push({ type: 'фича', title: f.title, data: JSON.stringify({ problem: f.problem, description: f.description }) });
-  }
-  while (slots.length < POSTS_PER_WEEK) {
-    slots.push({ type: 'новость', data: '{}' });
+  const special: string[] = [];
+  if (availableCases.length > 0) special.push('кейс');
+  if (availableFeatures.length > 0) special.push('фича');
+  const typeSlots = placeTypes(special);
+
+  // Не повторять тип в воскресенье прошлой недели и понедельник этой —
+  // единственная граница между неделями, которую видим на момент генерации.
+  const prevSunday = new Date(weekMonday); prevSunday.setDate(weekMonday.getDate() - 1);
+  const prevSundayType = planRows.find((r) => r.date === toDMY(prevSunday))?.type;
+  if (prevSundayType === typeSlots[0] && typeSlots[1] !== typeSlots[0]) {
+    [typeSlots[0], typeSlots[1]] = [typeSlots[1], typeSlots[0]];
   }
 
-  const simulated = [...planRows.map((r) => ({ date: r.date, type: r.type }))];
+  const byDate = new Map(planRows.map((r) => [r.date, r.type]));
   const added: Array<{ date: string; type: string }> = [];
+  let caseUsed = false;
+  let featureUsed = false;
 
-  for (const slot of slots) {
-    const date = pickDateInWeek(slot.type, simulated, weekMonday);
-    if (!date) continue; // неделя переполнена — пропускаем слот
-    await appendPlanRow({ date, type: slot.type, title: slot.title ?? '', token: slot.token ?? '', data: slot.data });
-    simulated.push({ date, type: slot.type });
-    added.push({ date, type: slot.type });
+  for (let i = 0; i < WEEK_OFFSETS.length; i++) {
+    const d = new Date(weekMonday);
+    d.setDate(weekMonday.getDate() + WEEK_OFFSETS[i]);
+    const dateStr = toDMY(d);
+    if (byDate.has(dateStr)) continue; // день уже занят — не перетираем
+
+    const type = typeSlots[i];
+    let token = '';
+    let title = '';
+    let data = '{}';
+    if (type === 'кейс' && !caseUsed) {
+      token = availableCases[0].token;
+      caseUsed = true;
+    } else if (type === 'фича' && !featureUsed) {
+      const f = availableFeatures[0];
+      title = f.title;
+      data = JSON.stringify({ problem: f.problem, description: f.description });
+      featureUsed = true;
+    }
+
+    await appendPlanRow({ date: dateStr, type, title, token, data });
+    added.push({ date: dateStr, type });
   }
 
   return NextResponse.json({
     ok: true,
     weekStart: toDMY(weekMonday),
     added,
-    note: availableCases.length === 0 && availableFeatures.length === 0
+    note: special.length === 0
       ? 'Свободных кейсов и фич нет — неделя вся из новостей. Добавь кейс/фичу в соответствующих разделах и сгенерируй план заново.'
       : undefined,
   });
