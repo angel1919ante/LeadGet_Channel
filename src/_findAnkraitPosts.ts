@@ -10,13 +10,10 @@ async function main() {
   const client = new TelegramClient(new StringSession(session), apiId, apiHash, { connectionRetries: 3 });
   await client.connect();
 
-  const entity = await client.getEntity(channel);
-  console.log(`channel title: ${(entity as { title?: string }).title ?? '(no title field)'}`);
-
-  const messages = await client.getMessages(channel, { limit: 10 });
+  const messages = await client.getMessages(channel, { limit: 5 });
   for (const m of messages) {
-    const preview = (m.text ?? m.message ?? '').slice(0, 60).replace(/\n/g, ' ');
-    console.log(`id=${m.id} date=${m.date} text="${preview}"`);
+    console.log(`===== id=${m.id} date=${m.date} =====`);
+    console.log(m.text ?? m.message ?? '');
   }
 
   await client.disconnect();
