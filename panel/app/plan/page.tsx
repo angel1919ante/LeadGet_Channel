@@ -200,6 +200,8 @@ export default function PlanPage() {
   const [newFeatureTitle, setNewFeatureTitle] = useState('');
   const [newCaseFields, setNewCaseFields] = useState<CaseFields>(EMPTY_CASE_FIELDS);
   const [creating, setCreating] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generateNote, setGenerateNote] = useState<string | null>(null);
 
   const load = () => {
     fetch('/api/plan').then((r) => r.json()).then((res) => {
@@ -299,6 +301,24 @@ export default function PlanPage() {
     load();
   };
 
+  const generateWeek = async () => {
+    setGenerating(true);
+    setGenerateNote(null);
+    const res = await fetch('/api/plan/generate-week', { method: 'POST' });
+    const json = await res.json();
+    setGenerating(false);
+    if (!res.ok) {
+      setGenerateNote('Не получилось — попробуй ещё раз.');
+      return;
+    }
+    setGenerateNote(
+      json.added.length > 0
+        ? `Неделя ${json.weekStart} — добавлено ${json.added.length}: ${json.added.map((a: { type: string }) => a.type).join(', ')}.${json.note ? ' ' + json.note : ''}`
+        : `Неделя ${json.weekStart} уже полностью занята.`,
+    );
+    load();
+  };
+
   const canCreate = newDate && (
     newType === 'новость' ||
     (newType === 'кейс' && newToken && newCaseFields.niche.trim()) ||
@@ -312,10 +332,17 @@ export default function PlanPage() {
           <h1>Контент-план</h1>
           <p className="sub">{rows ? `${rows.length} постов запланировано` : 'Загрузка…'}</p>
         </div>
-        <button className="btn approve" onClick={() => setFormOpen((v) => !v)}>
-          {formOpen ? 'Отмена' : '+ Добавить в план'}
-        </button>
+        <div className="row" style={{ gap: 10 }}>
+          <button className="btn ghost" disabled={generating} onClick={generateWeek}>
+            {generating ? <span className="spinner" /> : '📅 План на след. неделю'}
+          </button>
+          <button className="btn approve" onClick={() => setFormOpen((v) => !v)}>
+            {formOpen ? 'Отмена' : '+ Добавить в план'}
+          </button>
+        </div>
       </div>
+
+      {generateNote && <p className="field-hint" style={{ marginBottom: 16 }}>{generateNote}</p>}
 
       {formOpen && (
         <div className="card form-card">

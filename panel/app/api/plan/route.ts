@@ -35,8 +35,9 @@ export async function GET() {
   // Для формы "добавить в план": кейсы, ещё не одобренные под публикацию,
   // и фичи, которые ещё не в плане и не опубликованы.
   const plannedFeatureTitles = new Set(rows.filter((r) => r.type === 'фича').map((r) => r.title.trim().toLowerCase()));
+  const plannedCaseTokens = new Set(rows.filter((r) => r.type === 'кейс').map((r) => r.token));
   const availableCases = cases
-    .filter((c) => c.status === 'pending')
+    .filter((c) => c.status === 'pending' && !plannedCaseTokens.has(c.token))
     .map((c) => ({ token: c.token, niche: c.niche }));
   const availableFeatures = features
     .filter((f) => f.status !== 'posted' && !plannedFeatureTitles.has(f.title.trim().toLowerCase()))
