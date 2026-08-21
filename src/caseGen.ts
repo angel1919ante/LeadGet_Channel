@@ -10,7 +10,7 @@ interface CampaignInfo {
 
 interface CampaignSummary {
   sent: number;
-  read: number;
+  read?: number;
   replied: number;
   engaged: number;
   leads: number;
@@ -55,7 +55,7 @@ function scaleSummary(s: CampaignSummary): CampaignSummary {
   const scale = target / s.sent;
   return {
     sent: target,
-    read: Math.round(s.read * scale),
+    read: s.read !== undefined ? Math.round(s.read * scale) : undefined,
     replied: Math.round(s.replied * scale),
     engaged: Math.round(s.engaged * scale),
     leads: Math.round(s.leads * scale),
@@ -75,7 +75,7 @@ function buildResultsString(s: CampaignSummary, price?: string): string {
 
   const lines = [
     `<code>${s.sent}</code> сообщений отправлено`,
-    `<code>${s.read}</code> прочитали: (${pct(s.read, s.sent)})`,
+    ...(s.read !== undefined ? [`<code>${s.read}</code> прочитали: (${pct(s.read, s.sent)})`] : []),
     `<code>${s.replied}</code> ответили: (${pct(s.replied, s.sent)})`,
     `<code>${s.engaged}</code> диалогов: (${pct(s.engaged, s.sent)})`,
     `<code>${s.leads}</code> квалифицированных лида (${convPct}%)`,
@@ -116,7 +116,7 @@ export async function generateCase(row: ContentPlanRow): Promise<CaseGenResult> 
     data.summaryOverride
       ? Promise.resolve({
           sent: data.summaryOverride.sent ?? 0,
-          read: data.summaryOverride.read ?? 0,
+          read: data.summaryOverride.read,
           replied: data.summaryOverride.replied ?? 0,
           engaged: data.summaryOverride.engaged ?? 0,
           leads: data.summaryOverride.leads ?? 0,
