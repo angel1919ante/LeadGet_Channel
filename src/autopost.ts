@@ -215,8 +215,7 @@ async function main(): Promise<void> {
         title: news.title,
         data: JSON.stringify({ link: news.link, summary: news.summary }),
       });
-      // Ссылка на источник всегда в конце поста
-      rawPost = `${news.rawPost}\n\nИсточник: ${news.link}`;
+      rawPost = news.rawPost;
       sourceRef = news.link;
       newsRowNumber = news.rowNumber;
     } else if (planRow.type === 'кейс') {
