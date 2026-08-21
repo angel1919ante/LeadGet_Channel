@@ -121,9 +121,9 @@ function readCaseFields(dataStr: string): CaseFields {
 }
 
 function caseFieldsToData(f: CaseFields): Record<string, unknown> {
-  const data: Record<string, unknown> = {
-    niche: f.niche.trim(), task: f.task.trim(), mechanics: f.mechanics.trim(),
-  };
+  const data: Record<string, unknown> = { niche: f.niche.trim() };
+  if (f.task.trim()) data.task = f.task.trim();
+  if (f.mechanics.trim()) data.mechanics = f.mechanics.trim();
   if (f.price.trim()) data.price = f.price.trim();
   if (f.marketComparison.trim()) data.marketComparison = f.marketComparison.trim();
   if (f.boardTitle.trim()) data.boardTitle = f.boardTitle.trim();

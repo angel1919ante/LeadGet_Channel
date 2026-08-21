@@ -135,8 +135,8 @@ export async function generateCase(row: ContentPlanRow): Promise<CaseGenResult> 
     );
   }
   const niche = data.niche;
-  const task = data.task ?? 'лидогенерация через Telegram';
-  const mechanics = data.mechanics ?? 'рассылка по целевой базе, квалификация через бот';
+  const task = data.task || 'лидогенерация через Telegram';
+  const mechanics = data.mechanics || 'рассылка по целевой базе, квалификация через бот';
   const display = scaleSummary(summary);
   const results = buildResultsString(display, data.price);
 
