@@ -106,6 +106,10 @@ export async function formatPost(raw: string): Promise<string> {
     `<blockquote>${inner.trim()}</blockquote>`
   );
 
+  // "💡 База:" в кейс-постах — само слово "База" жирным (эмодзи-заголовок
+  // короче обычного subheader'а: с контентом на той же строке).
+  text = text.replace(/(^|\n)(💡\s*)База:/g, '$1$2<b>База</b>:');
+
   // `цифра или текст` → <b> — то, что модель сама пометила
   text = text.replace(/`([^`]+)`/g, '<b>$1</b>');
 
