@@ -1,19 +1,18 @@
-// Разовый скрипт: перегенерировать и перевыложить кейс-посты Анкрайт и
-// D-Format через реальный пайплайн generateCase() — теперь с масштабированием
-// отправок (D-Format 289 -> ~2000-4000) и новым форматом итогов (моноширинные
-// цифры пачкой). Доска тоже перерисовывается с новыми цифрами.
+// Разовый скрипт: перегенерировать и перевыложить кейс-пост D-Format —
+// заголовок доски раньше был длинным (ниша с уточнением в скобках) и
+// переполнял блок, наезжая на маскота. Запускать ПОСЛЕ fix-week-dates
+// (правит boardTitle в Данных строки), чтобы взять короткий заголовок.
 import { getContentPlanRows, updateContentPlanRow } from './sheets.ts';
 import { generateCase } from './caseGen.ts';
 import { renderCaseBoardCard } from './caseBoard.ts';
 import { formatPost } from './formatter.ts';
-import { postAsUser, sendPhotoAsUser, disconnectMTProto } from './mtproto.ts';
+import { sendPhotoAsUser, disconnectMTProto } from './mtproto.ts';
+import { TelegramClient } from 'telegram';
+import { StringSession } from 'telegram/sessions/index.js';
 
 const channel = process.env.POST_CHANNEL!;
-
-const TARGETS: Array<{ row: number; oldId: number }> = [
-  { row: 4, oldId: 88 },
-  { row: 5, oldId: 89 },
-];
+const ROW = 5;
+const OLD_ID = 92;
 
 function postLink(messageId: number): string {
   const username = channel.replace(/^@/, '');
@@ -22,38 +21,31 @@ function postLink(messageId: number): string {
 
 async function main() {
   const rows = await getContentPlanRows();
+  const planRow = rows.find((r) => r.rowNumber === ROW);
+  if (!planRow) throw new Error(`строка ${ROW} не найдена`);
 
-  for (const t of TARGETS) {
-    const planRow = rows.find((r) => r.rowNumber === t.row);
-    if (!planRow) throw new Error(`строка ${t.row} не найдена`);
+  const { postText, board } = await generateCase(planRow);
+  const formatted = await formatPost(postText);
+  const boardImage = await renderCaseBoardCard(board);
 
-    const { postText, board } = await generateCase(planRow);
-    const formatted = await formatPost(postText);
-    const boardImage = await renderCaseBoardCard(board);
+  console.log('----- TEXT -----');
+  console.log(formatted.replace(/<[^>]+>/g, ''));
 
-    console.log(`----- row ${t.row}: TEXT -----`);
-    console.log(formatted.replace(/<[^>]+>/g, ''));
+  const session = process.env.TELEGRAM_SESSION!;
+  const apiId = Number(process.env.TELEGRAM_API_ID);
+  const apiHash = process.env.TELEGRAM_API_HASH!;
+  const client = new TelegramClient(new StringSession(session), apiId, apiHash, { connectionRetries: 3 });
+  await client.connect();
+  await client.deleteMessages(channel, [OLD_ID], { revoke: true });
+  console.log(`deleted old message ${OLD_ID}`);
+  await client.disconnect();
 
-    // Тут не используем postAsUser напрямую для удаления/пересылки —
-    // сначала удаляем старое сообщение, затем шлём новое с фото.
-    const { TelegramClient } = await import('telegram');
-    const { StringSession } = await import('telegram/sessions/index.js');
-    const session = process.env.TELEGRAM_SESSION!;
-    const apiId = Number(process.env.TELEGRAM_API_ID);
-    const apiHash = process.env.TELEGRAM_API_HASH!;
-    const client = new TelegramClient(new StringSession(session), apiId, apiHash, { connectionRetries: 3 });
-    await client.connect();
-    await client.deleteMessages(channel, [t.oldId], { revoke: true });
-    console.log(`deleted old message ${t.oldId}`);
-    await client.disconnect();
+  const messageId = await sendPhotoAsUser(channel, boardImage, formatted);
+  const postUrl = postLink(messageId);
+  console.log(`posted: ${postUrl}`);
 
-    const messageId = await sendPhotoAsUser(channel, boardImage, formatted);
-    const postUrl = postLink(messageId);
-    console.log(`posted: ${postUrl}`);
-
-    await updateContentPlanRow(t.row, { status: 'posted', post: formatted, postUrl });
-    console.log(`row ${t.row} -> posted`);
-  }
+  await updateContentPlanRow(ROW, { status: 'posted', post: formatted, postUrl });
+  console.log(`row ${ROW} -> posted`);
 }
 
 main()
