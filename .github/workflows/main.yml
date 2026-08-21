@@ -13,7 +13,7 @@ on:
         options:
           - collect
           - publish
-          - fix-week-dates
+          - repost-dformat
 
 jobs:
   collect:
@@ -47,8 +47,8 @@ jobs:
       - if: steps.scan_cases.outcome == 'failure'
         run: echo "::warning::scan-cases упал (скорее всего LEADGET_ADMIN_TOKEN истёк) — сбор новостей это не затрагивает, но кейсы сегодня не просканированы"
 
-  fix-week-dates:
-    if: github.event.inputs.job == 'fix-week-dates'
+  repost-dformat:
+    if: github.event.inputs.job == 'repost-dformat'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,10 +56,16 @@ jobs:
         with:
           node-version: '20'
       - run: npm ci
-      - run: npx tsx src/_fixWeekDates.ts
+      - run: npx tsx src/_repostDFormat.ts
         env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          POST_CHANNEL: '@LeadGet_reviews'
 
   publish:
     if: github.event.schedule == '0 15 * * *' || github.event.inputs.job == 'publish'
