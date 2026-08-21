@@ -107,11 +107,49 @@ export async function fetchVC(): Promise<Candidate[]> {
   }
 }
 
+// РБК-фид — это общая политика/экономика/происшествия, а не бизнес/маркетинг
+// (в отличие от vc.ru, где firehose уже про стартапы и диджитал). Общие слова
+// из COSSA_KEYWORDS ("продаж", "телеграм", "реклам") там ловят случайные
+// совпадения в неродственных новостях — нужен более узкий, однозначный список.
+const RBC_KEYWORDS = [
+  'нейросет', 'искусственный интеллект', 'chatgpt', 'gpt', 'ии-агент', 'ллм', 'llm',
+  'яндекс директ', 'vk реклама', 'вк реклама', 'telegram ads', 'google ads', 'meta ads',
+  'таргетированн', 'таргетолог', 'перформанс-маркетинг', 'лидогенерац',
+  'сквозная аналитик', 'коллтрекинг', 'рекламный кабинет', 'цифровой маркетинг',
+  'digital-маркетинг', 'crm-систем',
+];
+
+// РБК — нет отдельной RSS-ленты по разделу "Технологии", есть только общий
+// поток главных новостей — фильтруем узким списком RBC_KEYWORDS до LLM-оценки.
+export async function fetchRBC(): Promise<Candidate[]> {
+  try {
+    const feed = await parser.parseURL('https://rssexport.rbc.ru/rbcnews/news/30/full.rss');
+    return feed.items
+      .filter((item) => {
+        if (!item.link) return false;
+        const text = `${item.title ?? ''} ${item.contentSnippet ?? ''}`.toLowerCase();
+        return RBC_KEYWORDS.some((kw) => text.includes(kw));
+      })
+      .slice(0, 20)
+      .map((item) => ({
+        source: 'rbc' as const,
+        title: item.title ?? '(без заголовка)',
+        link: item.link!,
+        rating: 0,
+        description: item.contentSnippet?.slice(0, 500) ?? item.content?.slice(0, 500) ?? '',
+      }));
+  } catch (e) {
+    console.error('rbc fetch failed:', e);
+    return [];
+  }
+}
+
 export async function fetchAll(): Promise<Candidate[]> {
-  const [habr, cossa, vc] = await Promise.all([
+  const [habr, cossa, vc, rbc] = await Promise.all([
     fetchHabr(),
     fetchCossa(),
     fetchVC(),
+    fetchRBC(),
   ]);
-  return [...habr, ...cossa, ...vc];
+  return [...habr, ...cossa, ...vc, ...rbc];
 }
