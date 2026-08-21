@@ -1,5 +1,5 @@
-// Живой пост D-Format содержал буквальный "[ПЕРИОД]" вместо реального
-// значения (LLM не подставил, как требует CASE_TZ) — чинит на месте.
+// Живой пост D-Format содержал буквальный "[ПЕРИОД]" — заменяем на
+// общую формулировку "период" без конкретного срока (по просьбе пользователя).
 import { getContentPlanRows, updateContentPlanRow } from './sheets.ts';
 import { generateCase } from './caseGen.ts';
 import { renderCaseBoardCard } from './caseBoard.ts';
@@ -23,7 +23,7 @@ async function main() {
     console.log(`deleted old message ${oldId}`);
   }
 
-  const fixed = row.post.replace(/\[ПЕРИОД\]/g, '14 дней');
+  const fixed = row.post.replace(/за 14 дней/i, 'за период').replace(/\[ПЕРИОД\]/g, 'период');
   const { board } = await generateCase(row);
   const boardImage = await renderCaseBoardCard(board);
 
