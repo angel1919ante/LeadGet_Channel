@@ -148,8 +148,10 @@ export async function generateCase(row: ContentPlanRow): Promise<CaseGenResult> 
 
   // Схема цифр борда: отправок / квал. лидов / гибкая третья (цена контакта, если есть, иначе конверсия)
   // — те же (масштабированные) цифры, что и в тексте поста, чтобы не расходились.
+  // Заголовок доски — короткий: без уточнения в скобках (оно для текста
+  // поста, на доске с широким шрифтом такая длина переполняет заголовок).
   const board: CaseBoardData = {
-    title: data.boardTitle ?? niche,
+    title: data.boardTitle ?? niche.replace(/\s*\([^)]*\)\s*$/, ''),
     subtitle: data.boardSubtitle ?? 'Выход на аудиторию в Telegram',
     numbers: [
       { value: String(display.sent), label: 'отправок' },

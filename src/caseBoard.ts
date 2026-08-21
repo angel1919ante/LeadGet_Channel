@@ -54,8 +54,20 @@ function arrowSvg(): string {
 // Центры трёх иконок/колонок метрик — точные значения из спека (п.7.1).
 const COL_X = [810, 1080, 1340];
 
+// Заголовок фиксированной высоты (до subtitle на y=279) — если текст
+// длинный, шрифт мельче, иначе он переполняет блок и наезжает на
+// маскота/подзаголовок (ширина 900px, но высоты не ограничены изначально).
+function titleFontSize(title: string): number {
+  const len = title.length;
+  if (len > 40) return 48;
+  if (len > 28) return 58;
+  if (len > 18) return 68;
+  return 80;
+}
+
 export async function renderCaseBoardCard(opts: CaseBoardOptions): Promise<Buffer> {
   const icons = opts.icons ?? DEFAULT_ICON_KEYS;
+  const titleSize = titleFontSize(opts.title);
 
   const mascotBuf = readFileSync(join(process.cwd(), 'assets', 'brand', 'mascot_board_transparent.png'));
   const mascotDataUri = `data:image/png;base64,${mascotBuf.toString('base64')}`;
@@ -92,8 +104,8 @@ export async function renderCaseBoardCard(opts: CaseBoardOptions): Promise<Buffe
     background-size: 56px 56px;
   }
 
-  .title { position:absolute; left:64px; top:54px; width:900px; }
-  .title h1 { font-family:${FONTS.display}; font-size:80px; font-weight:700; color:${PALETTE.nearBlack}; line-height:0.95; letter-spacing:-0.01em; }
+  .title { position:absolute; left:64px; top:54px; width:900px; height:210px; overflow:hidden; }
+  .title h1 { font-family:${FONTS.display}; font-size:${titleSize}px; font-weight:700; color:${PALETTE.nearBlack}; line-height:0.95; letter-spacing:-0.01em; }
   .sub { position:absolute; left:68px; top:279px; font-family:${FONTS.mono}; font-size:27px; font-weight:500; letter-spacing:0.05em; text-transform:uppercase; color:${PALETTE.green}; }
 
   .mascot { position:absolute; left:145px; top:345px; width:520px; height:513px; object-fit:contain; object-position:bottom center; }
