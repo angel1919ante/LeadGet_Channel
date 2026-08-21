@@ -646,11 +646,14 @@ export async function getContentPlanRows(): Promise<ContentPlanRow[]> {
 
 export async function updateContentPlanRow(
   rowNumber: number,
-  patch: { title?: string; data?: string; status?: string; post?: string; postUrl?: string },
+  patch: { date?: string; type?: string; title?: string; token?: string; data?: string; status?: string; post?: string; postUrl?: string },
 ): Promise<void> {
   const sheets = getClient();
   const ranges: sheets_v4.Schema$ValueRange[] = [];
+  if (patch.date !== undefined) ranges.push({ range: `${CP_SHEET}!A${rowNumber}`, values: [[patch.date]] });
+  if (patch.type !== undefined) ranges.push({ range: `${CP_SHEET}!B${rowNumber}`, values: [[patch.type]] });
   if (patch.title !== undefined) ranges.push({ range: `${CP_SHEET}!C${rowNumber}`, values: [[patch.title]] });
+  if (patch.token !== undefined) ranges.push({ range: `${CP_SHEET}!D${rowNumber}`, values: [[patch.token]] });
   if (patch.data !== undefined) ranges.push({ range: `${CP_SHEET}!E${rowNumber}`, values: [[patch.data]] });
   if (patch.status !== undefined) ranges.push({ range: `${CP_SHEET}!F${rowNumber}`, values: [[patch.status]] });
   if (patch.post !== undefined) ranges.push({ range: `${CP_SHEET}!G${rowNumber}`, values: [[patch.post]] });
