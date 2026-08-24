@@ -5,6 +5,7 @@ const CP_SHEET = 'ContentPlan';
 const CASES_SHEET = 'Cases';
 const FEAT_SHEET = 'Features';
 const PREF_SHEET = 'Preferences';
+const ART_SHEET = 'Articles';
 
 function getClient(): sheets_v4.Sheets {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -225,6 +226,65 @@ export interface PreferenceRow {
   rejected: number;
   trust: string;
   globalThreshold: string;
+}
+
+export interface ArticleRow {
+  rowNumber: number;
+  id: string;
+  date: string;
+  platform: string;
+  sourceUrl: string;
+  sourceTitle: string;
+  status: string;
+  content: string;
+  publishedUrl: string;
+}
+
+export async function getArticleRows(): Promise<ArticleRow[]> {
+  const sheets = getClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: getSheetId(),
+    range: `${ART_SHEET}!A2:H`,
+  });
+  return (res.data.values ?? []).map((r, i) => ({
+    rowNumber: i + 2,
+    id: r[0] ?? '',
+    date: r[1] ?? '',
+    platform: r[2] ?? '',
+    sourceUrl: r[3] ?? '',
+    sourceTitle: r[4] ?? '',
+    status: (r[5] ?? '').trim().toLowerCase(),
+    content: r[6] ?? '',
+    publishedUrl: r[7] ?? '',
+  }));
+}
+
+export async function appendArticle(row: { platform: string; title: string; content: string }): Promise<void> {
+  const sheets = getClient();
+  const now = new Date().toISOString().slice(0, 10);
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: getSheetId(),
+    range: `${ART_SHEET}!A:H`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[String(Date.now()), now, row.platform, '', row.title, 'pending', row.content, '']] },
+  });
+}
+
+export async function setArticleRow(
+  rowNumber: number,
+  patch: { status?: string; content?: string; sourceTitle?: string; publishedUrl?: string },
+): Promise<void> {
+  const sheets = getClient();
+  const data: sheets_v4.Schema$ValueRange[] = [];
+  if (patch.sourceTitle !== undefined) data.push({ range: `${ART_SHEET}!E${rowNumber}`, values: [[patch.sourceTitle]] });
+  if (patch.status !== undefined) data.push({ range: `${ART_SHEET}!F${rowNumber}`, values: [[patch.status]] });
+  if (patch.content !== undefined) data.push({ range: `${ART_SHEET}!G${rowNumber}`, values: [[patch.content]] });
+  if (patch.publishedUrl !== undefined) data.push({ range: `${ART_SHEET}!H${rowNumber}`, values: [[patch.publishedUrl]] });
+  if (data.length === 0) return;
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: getSheetId(),
+    requestBody: { valueInputOption: 'RAW', data },
+  });
 }
 
 export async function getPreferenceRows(): Promise<PreferenceRow[]> {

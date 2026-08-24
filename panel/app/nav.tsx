@@ -12,6 +12,7 @@ export default function Nav() {
         <Link href="/" className={`tab ${pathname === '/' ? 'active' : ''}`}>Новости</Link>
         <Link href="/cases" className={`tab ${pathname === '/cases' ? 'active' : ''}`}>Кейсы</Link>
         <Link href="/features" className={`tab ${pathname === '/features' ? 'active' : ''}`}>Фичи</Link>
+        <Link href="/articles" className={`tab ${pathname === '/articles' ? 'active' : ''}`}>Статьи</Link>
         <Link href="/plan" className={`tab ${pathname === '/plan' ? 'active' : ''}`}>План</Link>
         <Link href="/preferences" className={`tab ${pathname === '/preferences' ? 'active' : ''}`}>Настройки</Link>
       </div>
