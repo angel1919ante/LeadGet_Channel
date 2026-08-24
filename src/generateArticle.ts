@@ -25,6 +25,12 @@ async function main(): Promise<void> {
     const news = await getAllRows();
     const row = news.find((r) => r.rowNumber === newsRowNum);
     if (!row) throw new Error(`News row ${newsRowNum} не найдена`);
+    // Нельзя публиковать статью по мотивам новости с площадки X обратно на X
+    // (например, новость с Хабра -> статья на Хабр) — выглядит как копия/дубль
+    // на той же площадке, откуда взят материал.
+    if (row.source === platform) {
+      throw new Error(`Нельзя сделать статью для "${platform}" из новости с этой же площадки (источник: ${row.source}) — выбери другую площадку`);
+    }
     const candidate: Candidate = { source: row.source as Source, title: row.title, link: row.link, rating: row.rating, description: row.summary };
     prompt = articlePrompt(candidate, platform, tone);
     sourceUrl = row.link;

@@ -147,7 +147,12 @@ export default function NewsPage() {
             )}
             <button
               className="btn ghost"
-              onClick={() => setArticleOpen(articleOpen === r.rowNumber ? null : r.rowNumber)}
+              onClick={() => {
+                if (articleOpen !== r.rowNumber && articlePlatform === r.source) {
+                  setArticlePlatform(ARTICLE_PLATFORMS.find((p) => p.key !== r.source)?.key ?? 'habr');
+                }
+                setArticleOpen(articleOpen === r.rowNumber ? null : r.rowNumber);
+              }}
             >
               → Статья
             </button>
@@ -157,8 +162,11 @@ export default function NewsPage() {
             <div className="case-edit-card">
               <label className="field-label">Площадка</label>
               <select className="field-input" value={articlePlatform} onChange={(e) => setArticlePlatform(e.target.value)}>
-                {ARTICLE_PLATFORMS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+                {ARTICLE_PLATFORMS.filter((p) => p.key !== r.source).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
               </select>
+              {ARTICLE_PLATFORMS.some((p) => p.key === r.source) && (
+                <p className="field-hint">Нельзя выложить на {ARTICLE_PLATFORMS.find((p) => p.key === r.source)?.label} — новость оттуда же</p>
+              )}
               <div className="row" style={{ marginTop: 8 }}>
                 <button className="btn approve" disabled={articleBusy === r.rowNumber} onClick={() => generateArticle(r.rowNumber)}>
                   {articleBusy === r.rowNumber ? <span className="spinner" /> : 'Сгенерировать'}
