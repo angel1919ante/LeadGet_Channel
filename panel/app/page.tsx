@@ -22,6 +22,19 @@ const FILTERS: Array<{ key: string; label: string }> = [
   { key: 'error', label: 'Ошибка' },
 ];
 
+// Новости, которые никто не решил за 4+ дня — просто мусор в очереди, не
+// стоит держать их на виду (не reject, статус в таблице не трогаем, только
+// прячем из панели).
+const STALE_DAYS = 4;
+
+function isStalePending(r: NewsRow): boolean {
+  if (r.status !== 'pending') return false;
+  const posted = new Date(r.date);
+  if (isNaN(posted.getTime())) return false;
+  const days = (Date.now() - posted.getTime()) / (1000 * 60 * 60 * 24);
+  return days > STALE_DAYS;
+}
+
 const ARTICLE_PLATFORMS = [
   { key: 'habr', label: 'Хабр' },
   { key: 'vc', label: 'VC.ru' },
@@ -70,9 +83,10 @@ export default function NewsPage() {
     }));
   };
 
-  const visible = rows?.filter((r) => filter === 'all' || r.status === filter) ?? null;
+  const activeRows = rows?.filter((r) => !isStalePending(r)) ?? null;
+  const visible = activeRows?.filter((r) => filter === 'all' || r.status === filter) ?? null;
   const counts = FILTERS.reduce<Record<string, number>>((acc, f) => {
-    acc[f.key] = f.key === 'all' ? (rows?.length ?? 0) : (rows?.filter((r) => r.status === f.key).length ?? 0);
+    acc[f.key] = f.key === 'all' ? (activeRows?.length ?? 0) : (activeRows?.filter((r) => r.status === f.key).length ?? 0);
     return acc;
   }, {});
 
