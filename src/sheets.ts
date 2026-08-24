@@ -340,13 +340,16 @@ export async function appendArticles(
 
 export async function updateArticleRow(
   rowNumber: number,
-  patch: { status?: string; publishedUrl?: string },
+  patch: { status?: string; content?: string; publishedUrl?: string },
 ): Promise<void> {
   const sheets = getClient();
   const spreadsheetId = getSheetId();
   const data: sheets_v4.Schema$ValueRange[] = [];
   if (patch.status !== undefined) {
     data.push({ range: `${ART_SHEET}!F${rowNumber}`, values: [[patch.status]] });
+  }
+  if (patch.content !== undefined) {
+    data.push({ range: `${ART_SHEET}!G${rowNumber}`, values: [[patch.content]] });
   }
   if (patch.publishedUrl !== undefined) {
     data.push({ range: `${ART_SHEET}!H${rowNumber}`, values: [[patch.publishedUrl]] });
