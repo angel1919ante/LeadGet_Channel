@@ -113,3 +113,17 @@ ${seoBlock}`;
 Выведи ТОЛЬКО итоговый результат по указанному формату. Без комментариев и пояснений.`;
   return { cached, dynamic };
 }
+
+// Статья без привязки к новости-источнику — тему придумывает/раскрывает сам автор.
+export function articlePromptFromTopic(topic: string, platform: Platform): Prompt {
+  const seoBlock = SEO_PLATFORMS.includes(platform) ? SEO_RULES : '';
+  const cached = `Ты редактор и автор контента платформы LeadGet.
+${COMMON_RULES}
+${PLATFORM_RULES[platform]}
+${seoBlock}`;
+  const dynamic = `ТЕМА СТАТЬИ (раскрой содержание сам, без внешнего источника-новости):
+${topic}
+
+Выведи ТОЛЬКО итоговый результат по указанному формату. Без комментариев и пояснений.`;
+  return { cached, dynamic };
+}

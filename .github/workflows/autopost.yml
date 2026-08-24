@@ -21,6 +21,7 @@ on:
           - test-news
           - learn
           - gen-pen-pose
+          - generate-article
       test_case_token:
         description: 'Токен кампании для теста (только для test-case)'
         required: false
@@ -51,6 +52,18 @@ on:
         default: ''
       plan_row:
         description: 'Номер строки ContentPlan для публикации вне очереди (только для post-row)'
+        required: false
+        default: ''
+      news_row:
+        description: 'Номер строки News, из которой сгенерировать статью (только для generate-article)'
+        required: false
+        default: ''
+      topic:
+        description: 'Свободная тема для статьи, если без привязки к новости (только для generate-article)'
+        required: false
+        default: ''
+      platform:
+        description: 'Площадка статьи: habr/vc/dzen/x (только для generate-article)'
         required: false
         default: ''
 
@@ -233,6 +246,25 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           POST_CHANNEL: '@LeadGet_reviews'
           DELETE_ROW: ${{ github.event.inputs.plan_row }}
+
+  generate-article:
+    if: github.event.inputs.job == 'generate-article'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm run generate-article
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          NEWS_ROW: ${{ github.event.inputs.news_row }}
+          TOPIC: ${{ github.event.inputs.topic }}
+          PLATFORM: ${{ github.event.inputs.platform }}
 
   post:
     if: github.event.inputs.job == 'post' || github.event_name == 'schedule'

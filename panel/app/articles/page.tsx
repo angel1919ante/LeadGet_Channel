@@ -41,11 +41,36 @@ export default function ArticlesPage() {
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
   const [busy, setBusy] = useState<number | null>(null);
+  const [genOpen, setGenOpen] = useState(false);
+  const [genPlatform, setGenPlatform] = useState('habr');
+  const [genTopic, setGenTopic] = useState('');
+  const [genBusy, setGenBusy] = useState(false);
+  const [genStatus, setGenStatus] = useState('');
 
   const load = () => {
     fetch('/api/articles').then((r) => r.json()).then(setRows);
   };
   useEffect(load, []);
+
+  const generate = async () => {
+    if (!genTopic.trim()) return;
+    setGenBusy(true);
+    setGenStatus('');
+    const res = await fetch('/api/articles/generate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ platform: genPlatform, topic: genTopic.trim() }),
+    });
+    setGenBusy(false);
+    if (res.ok) {
+      setGenStatus('Запущено — статья появится в списке через ~30 секунд.');
+      setGenTopic('');
+      setTimeout(load, 20000);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setGenStatus(`Не вышло: ${data.error ?? 'неизвестная ошибка'}`);
+    }
+  };
 
   const submit = async () => {
     if (!title.trim() || !content.trim()) return;
@@ -118,10 +143,34 @@ export default function ArticlesPage() {
           <h1>Статьи</h1>
           <p className="sub">{rows ? `${rows.length} всего` : 'Загрузка…'}</p>
         </div>
-        <button className="btn approve" onClick={() => setFormOpen((v) => !v)}>
-          {formOpen ? 'Отмена' : '+ Добавить статью'}
-        </button>
+        <div className="row">
+          <button className="btn ghost" onClick={() => setGenOpen((v) => !v)}>
+            {genOpen ? 'Отмена' : '🤖 Сгенерировать статью'}
+          </button>
+          <button className="btn approve" onClick={() => setFormOpen((v) => !v)}>
+            {formOpen ? 'Отмена' : '+ Добавить статью'}
+          </button>
+        </div>
       </div>
+
+      {genOpen && (
+        <div className="card form-card">
+          <label className="field-label">Площадка</label>
+          <select className="field-input" value={genPlatform} onChange={(e) => setGenPlatform(e.target.value)}>
+            {PLATFORMS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+          </select>
+
+          <label className="field-label">Тема статьи</label>
+          <input className="field-input" value={genTopic} onChange={(e) => setGenTopic(e.target.value)} placeholder="О чём написать" />
+
+          <div className="row" style={{ marginTop: 12 }}>
+            <button className="btn approve" disabled={genBusy || !genTopic.trim()} onClick={generate}>
+              {genBusy ? <span className="spinner" /> : 'Сгенерировать'}
+            </button>
+          </div>
+          {genStatus && <p className="field-hint">{genStatus}</p>}
+        </div>
+      )}
 
       <div className="row" style={{ marginBottom: 20, flexWrap: 'wrap' }}>
         <button className={`btn ${filter === 'all' ? 'approve' : 'ghost'}`} onClick={() => setFilter('all')}>Все</button>

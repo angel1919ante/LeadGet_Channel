@@ -7,6 +7,7 @@
     "collect": "tsx src/collect.ts",
     "publish": "tsx src/publish.ts",
     "generate:articles": "tsx src/articles.ts",
+    "generate-article": "tsx src/generateArticle.ts",
     "autopost": "tsx src/autopost.ts",
     "init-sheets": "tsx src/initSheets.ts",
     "scan-cases": "tsx src/caseScanner.ts",
