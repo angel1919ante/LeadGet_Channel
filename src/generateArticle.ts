@@ -4,6 +4,7 @@
 import { getAllRows, appendArticles } from './sheets.ts';
 import { callLLM } from './llm.ts';
 import { articlePrompt, articlePromptFromTopic } from './articlePrompts.ts';
+import { loadToneSamples } from './toneSamples.ts';
 import type { Platform } from './articleTypes.ts';
 import type { Candidate, Source } from './types.ts';
 
@@ -14,6 +15,8 @@ async function main(): Promise<void> {
   const newsRowNum = process.env.NEWS_ROW ? Number(process.env.NEWS_ROW) : undefined;
   const topic = process.env.TOPIC?.trim();
 
+  const tone = await loadToneSamples().catch(() => ({ ours: [], learn: [] }));
+
   let prompt;
   let sourceUrl = '';
   let sourceTitle = '';
@@ -23,11 +26,11 @@ async function main(): Promise<void> {
     const row = news.find((r) => r.rowNumber === newsRowNum);
     if (!row) throw new Error(`News row ${newsRowNum} не найдена`);
     const candidate: Candidate = { source: row.source as Source, title: row.title, link: row.link, rating: row.rating, description: row.summary };
-    prompt = articlePrompt(candidate, platform);
+    prompt = articlePrompt(candidate, platform, tone);
     sourceUrl = row.link;
     sourceTitle = row.title;
   } else if (topic) {
-    prompt = articlePromptFromTopic(topic, platform);
+    prompt = articlePromptFromTopic(topic, platform, tone);
     sourceTitle = topic;
   } else {
     throw new Error('нужен либо NEWS_ROW, либо TOPIC');

@@ -138,7 +138,7 @@ ${COMMON_BANS}
 
 Выведи ТОЛЬКО итоговый текст поста. Без комментариев, без пояснений, без «вот пост:».`;
 
-function toneBlock(samples: ToneSamples | undefined): string {
+export function toneBlock(samples: ToneSamples | undefined): string {
   if (!samples || (!samples.ours.length && !samples.learn.length)) return '';
   const parts: string[] = ['\n---\nПРИМЕРЫ СТИЛЯ (учитывай при написании):'];
   if (samples.ours.length) {

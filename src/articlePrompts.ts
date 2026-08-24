@@ -1,6 +1,8 @@
 import type { Candidate } from './types.ts';
 import type { Platform } from './articleTypes.ts';
 import type { Prompt } from './llm.ts';
+import type { ToneSamples } from './toneSamples.ts';
+import { toneBlock } from './prompts.ts';
 
 const COMMON_RULES = `
 ТЕМА: лидогенерация, Telegram-маркетинг, автоматизация продаж, рынок рекламы для российского бизнеса.
@@ -24,7 +26,9 @@ const COMMON_RULES = `
 - Никаких апоризмов ("Реклама — это язык доверия")
 - Никакой раздутой значимости ("переломный момент", "знаменует")
 - Слой 3 не начинается с "Именно поэтому LeadGet..." — позиция вытекает из логики
-- "ИИ-агент" не как главный акцент — говори о результате`;
+- "ИИ-агент" не как главный акцент — говори о результате
+
+ТОН ГОЛОСА: тот же голос, что и в нашем Telegram-канале (см. примеры стиля ниже, если приложены) — живая речь человека, не сухой корпоративный текст, не AI-отчёт. По тексту статьи используй 2-3 уместных русских фразеологизма/устойчивых выражения (например: "изобретать велосипед", "набить руку", "как на ладони", "взять быка за рога", "держать руку на пульсе", "играть в долгую"), органично по смыслу конкретного абзаца, не через силу и не подряд в одном месте — если для абзаца ни один не подходит естественно, лучше пропустить, чем притянуть за уши.`;
 
 const SEO_RULES = `
 SEO-ТРЕБОВАНИЯ (площадка индексируется поисковиками):
@@ -98,12 +102,12 @@ const PLATFORM_RULES: Record<Platform, string> = {
 const SEO_PLATFORMS: Platform[] = ['habr', 'vc', 'dzen'];
 
 // cached: правила площадки — одинаковы для каждой новости с этой же площадкой в одном прогоне.
-export function articlePrompt(c: Candidate, platform: Platform): Prompt {
+export function articlePrompt(c: Candidate, platform: Platform, tone?: ToneSamples): Prompt {
   const seoBlock = SEO_PLATFORMS.includes(platform) ? SEO_RULES : '';
   const cached = `Ты редактор и автор контента платформы LeadGet.
 ${COMMON_RULES}
 ${PLATFORM_RULES[platform]}
-${seoBlock}`;
+${seoBlock}${toneBlock(tone)}`;
   const dynamic = `ИСХОДНАЯ НОВОСТЬ:
 Заголовок: ${c.title}
 Источник: ${c.source}
@@ -115,12 +119,12 @@ ${seoBlock}`;
 }
 
 // Статья без привязки к новости-источнику — тему придумывает/раскрывает сам автор.
-export function articlePromptFromTopic(topic: string, platform: Platform): Prompt {
+export function articlePromptFromTopic(topic: string, platform: Platform, tone?: ToneSamples): Prompt {
   const seoBlock = SEO_PLATFORMS.includes(platform) ? SEO_RULES : '';
   const cached = `Ты редактор и автор контента платформы LeadGet.
 ${COMMON_RULES}
 ${PLATFORM_RULES[platform]}
-${seoBlock}`;
+${seoBlock}${toneBlock(tone)}`;
   const dynamic = `ТЕМА СТАТЬИ (раскрой содержание сам, без внешнего источника-новости):
 ${topic}
 
