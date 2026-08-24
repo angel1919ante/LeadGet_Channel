@@ -1,4 +1,4 @@
-import { getAllRows, ensurePreferencesSheet, writePreferences } from './sheets.ts';
+import { getAllRows, ensurePreferencesSheet, writePreferences, readPreferences } from './sheets.ts';
 import type { PreferenceRow } from './sheets.ts';
 
 // Рейтинг хранится как 0–100 (relevance*10), возвращаем к шкале 1–10
@@ -6,23 +6,15 @@ function toScore(rating: number): number {
   return rating > 10 ? rating / 10 : rating;
 }
 
-// Находим порог (1–10), при котором лучше всего разделяются approved и rejected
-function findThreshold(decided: Array<{ score: number; positive: boolean }>): number {
-  let bestThreshold = 7;
-  let bestAccuracy = 0;
-
-  for (let t = 2; t <= 10; t += 0.5) {
-    const correct = decided.filter(
-      (d) => (d.positive && d.score >= t) || (!d.positive && d.score < t),
-    ).length;
-    const accuracy = correct / decided.length;
-    if (accuracy > bestAccuracy) {
-      bestAccuracy = accuracy;
-      bestThreshold = t;
-    }
-  }
-  return bestThreshold;
-}
+// ВАЖНО: глобальный порог релевантности мы больше НЕ подбираем автоматически
+// по approved/rejected. Отказ (rejected) далеко не всегда означает "низкая
+// релевантность" — часто новость просто "не подошла" (не тот формат, дата,
+// дубль темы), хотя релевантность у неё нормальная. Автоподбор трактовал
+// каждый reject как сигнал "требовать выше" и на реальных данных утянул
+// порог до 2 (почти отключил фильтр) — потому что часть решённых строк
+// вообще без скоринга (rating=0, старые/бэкфиленные), что математически
+// "хорошо разделяется" при любом пороге ≥2, но не отражает реальность.
+// Порог теперь только ручной (Preferences!I2), учимся — только per-source trust.
 
 async function main(): Promise<void> {
   await ensurePreferencesSheet();
@@ -35,13 +27,9 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Глобальный порог
-  const scoredDecided = decided.map((r) => ({
-    score: toScore(r.rating),
-    positive: r.status === 'approved' || r.status === 'posted',
-  }));
-  const threshold = findThreshold(scoredDecided);
-  console.log(`learn: решено=${decided.length}, порог=${threshold}`);
+  // Порог берём как есть из Preferences (ручная настройка) — не пересчитываем.
+  const { globalThreshold: threshold } = await readPreferences().catch(() => ({ globalThreshold: 7 }));
+  console.log(`learn: решено=${decided.length}, порог сохранён=${threshold}`);
 
   // Статистика по источникам: сразу раскладываем оценки по positive/negative
   const bySource = new Map<string, { positive: number[]; negative: number[] }>();
