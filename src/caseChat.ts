@@ -41,17 +41,31 @@ function bubble(m: ChatMessage, botLabel: string): string {
   </div>`;
 }
 
+// Уровни плотности — если сообщений много (спек допускает 3-6 на слайд) и
+// контент не влезает в фиксированный канвас 1254×1254, автоматически сжимаем
+// отступы/шрифт вместо того, чтобы молча обрезать блок результата снизу
+// (bubble.bot/client + line-height подобраны так, чтобы текст на любом
+// уровне оставался читаемым).
+const DENSITY_LEVELS = [
+  { gap: 28, padV: 24, font: 21, roleMb: 14, resultMt: 48 },
+  { gap: 22, padV: 20, font: 20, roleMb: 12, resultMt: 36 },
+  { gap: 16, padV: 16, font: 19, roleMb: 10, resultMt: 26 },
+  { gap: 12, padV: 14, font: 18, roleMb: 8, resultMt: 18 },
+];
+
 export async function renderCaseChatSlide(opts: CaseChatSlideOptions): Promise<Buffer> {
   const botLabel = opts.botLabel ?? 'ИИ-АГЕНТ · LEADGET';
   const counter = `${String(opts.page).padStart(2, '0')} / ${String(opts.total).padStart(2, '0')}`;
   const pageNum = String(opts.page).padStart(2, '0');
 
   const messagesHtml = opts.messages.map((m) => bubble(m, botLabel)).join('');
+  const d0 = DENSITY_LEVELS[0];
 
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><style>
   @import url('${FONTS_IMPORT_URL}');
   * { margin:0; padding:0; box-sizing:border-box; }
+  :root { --gap:${d0.gap}px; --padV:${d0.padV}px; --font:${d0.font}px; --roleMb:${d0.roleMb}px; --resultMt:${d0.resultMt}px; }
   body {
     width:${CANVAS}px; height:${CANVAS}px; position:relative; overflow:hidden;
     background: ${PALETTE.cream};
@@ -71,25 +85,25 @@ export async function renderCaseChatSlide(opts: CaseChatSlideOptions): Promise<B
 
   .divider { position:absolute; left:64px; right:64px; top:218px; height:2px; background:${GRID}; }
 
-  .thread { position:absolute; left:0; top:242px; width:${CANVAS}px; display:flex; flex-direction:column; gap:28px; }
+  .thread { position:absolute; left:0; top:242px; width:${CANVAS}px; display:flex; flex-direction:column; gap:var(--gap); }
 
   .row { display:flex; padding-left:64px; padding-right:64px; }
   .row.bot { justify-content:flex-end; }
   .row.client { justify-content:flex-start; }
 
-  .bubble { border-radius:28px; padding:24px 28px; }
+  .bubble { border-radius:28px; padding:var(--padV) 28px; }
   .bubble.bot { background:${PALETTE.nearBlack}; min-width:300px; max-width:760px; }
   .bubble.client { background:#F8F6F0; border:2px solid ${GRID}; min-width:180px; max-width:680px; }
 
-  .role { font-family:${FONTS.mono}; font-size:12px; font-weight:500; letter-spacing:0.05em; text-transform:uppercase; margin-bottom:14px; }
+  .role { font-family:${FONTS.mono}; font-size:12px; font-weight:500; letter-spacing:0.05em; text-transform:uppercase; margin-bottom:var(--roleMb); }
   .bubble.bot .role { color:${PALETTE.green}; }
   .bubble.client .role { color:${PALETTE.secondaryText}; opacity:0.75; }
 
-  .body { font-family:${FONTS.body}; font-size:21px; font-weight:500; line-height:1.4; }
+  .body { font-family:${FONTS.body}; font-size:var(--font); font-weight:500; line-height:1.4; }
   .bubble.bot .body { color:${PALETTE.cream}; }
   .bubble.client .body { color:${PALETTE.nearBlack}; }
 
-  .result { margin-top:48px; padding-left:64px; padding-right:64px; }
+  .result { margin-top:var(--resultMt); padding-left:64px; padding-right:64px; }
   .result-line { height:2px; background:${GRID}; margin-bottom:24px; }
   .result-label { display:flex; align-items:center; gap:9px; font-family:${FONTS.mono}; font-size:13px; font-weight:500; letter-spacing:0.06em; text-transform:uppercase; color:${PALETTE.green}; margin-bottom:12px; }
   .result-label .dot { width:10px; height:10px; background:${PALETTE.green}; border-radius:2px; }
@@ -123,6 +137,26 @@ export async function renderCaseChatSlide(opts: CaseChatSlideOptions): Promise<B
     await page.setViewport({ width: CANVAS, height: CANVAS });
     await page.setContent(html, { waitUntil: 'load' });
     await page.evaluate(() => document.fonts.ready);
+
+    for (let level = 1; level < DENSITY_LEVELS.length; level++) {
+      const bottom = await page.evaluate(() => document.querySelector('.thread')?.getBoundingClientRect().bottom ?? 0);
+      if (bottom <= CANVAS - 20) break;
+      const d = DENSITY_LEVELS[level];
+      await page.evaluate((d) => {
+        const root = document.documentElement.style;
+        root.setProperty('--gap', `${d.gap}px`);
+        root.setProperty('--padV', `${d.padV}px`);
+        root.setProperty('--font', `${d.font}px`);
+        root.setProperty('--roleMb', `${d.roleMb}px`);
+        root.setProperty('--resultMt', `${d.resultMt}px`);
+      }, d);
+    }
+
+    const finalBottom = await page.evaluate(() => document.querySelector('.thread')?.getBoundingClientRect().bottom ?? 0);
+    if (finalBottom > CANVAS - 20) {
+      console.warn(`caseChat: slide "${opts.stageTitle}" всё ещё не влезает (bottom=${finalBottom}) даже на максимальной плотности — рассмотри меньше сообщений на слайде`);
+    }
+
     const buf = await page.screenshot({ type: 'png' });
     return buf as Buffer;
   } finally {
