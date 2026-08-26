@@ -146,8 +146,8 @@ export async function generateCase(row: ContentPlanRow): Promise<CaseGenResult> 
   // Inject results directly — LLM cannot strip [QUOTE] tags this way
   const postText = rawPost.replace('<<RESULTS>>', results);
 
-  // Схема цифр борда: отправок / квал. лидов / гибкая третья (цена контакта, если есть, иначе конверсия)
-  // — те же (масштабированные) цифры, что и в тексте поста, чтобы не расходились.
+  // Схема цифр борда (правка Павла): отправок / диалогов / квалов — те же
+  // (масштабированные) цифры, что и в тексте поста, чтобы не расходились.
   // Заголовок доски — короткий: без уточнения в скобках (оно для текста
   // поста, на доске с широким шрифтом такая длина переполняет заголовок).
   const board: CaseBoardData = {
@@ -155,10 +155,8 @@ export async function generateCase(row: ContentPlanRow): Promise<CaseGenResult> 
     subtitle: data.boardSubtitle ?? 'Выход на аудиторию в Telegram',
     numbers: [
       { value: String(display.sent), label: 'отправок' },
-      { value: String(display.leads), label: 'квал. лидов' },
-      data.price
-        ? { value: `${data.price} ₽`, label: 'контакт' }
-        : { value: pct(display.leads, display.sent), label: 'конверсия' },
+      { value: String(display.engaged), label: 'диалогов' },
+      { value: String(display.leads), label: 'квалов' },
     ],
   };
 
