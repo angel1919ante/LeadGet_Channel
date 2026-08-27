@@ -1,17 +1,10 @@
 import { fetchAll } from './sources.ts';
 import {
   ensureHeader, getAllRows, appendPending, readPreferences,
-  ensureContentPlanSheet, getContentPlanRows, appendContentPlanRow,
+  ensureContentPlanSheet,
 } from './sheets.ts';
 import { callLLM } from './llm.ts';
 import { summaryPrompt, relevancePrompt } from './prompts.ts';
-
-// Формат даты в ContentPlan: DD.MM.YYYY
-function todayDMY(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
-}
 
 async function main(): Promise<void> {
   await Promise.all([ensureHeader(), ensureContentPlanSheet()]);
@@ -83,18 +76,11 @@ async function main(): Promise<void> {
   await appendPending(rows);
   console.log(`appended ${rows.length} rows (${rows.filter((r) => r.status === 'approved').length} auto-approved)`);
 
-  // Если на сегодня в ContentPlan ещё ничего не запланировано и есть approved-кандидат —
-  // ставим "новость" на сегодня, чтобы autopost было что публиковать без ручного планирования.
-  const today = todayDMY();
-  const plans = await getContentPlanRows();
-  const hasPlanToday = plans.some((p) => p.date === today);
-  const hasApprovedNews = existing.some((r) => r.status === 'approved') || rows.some((r) => r.status === 'approved');
-  if (!hasPlanToday && hasApprovedNews) {
-    await appendContentPlanRow({ date: today, type: 'новость', title: '', token: '', data: '{}' });
-    console.log(`ContentPlan: добавлена строка "новость" на ${today}`);
-  } else if (!hasPlanToday) {
-    console.log(`ContentPlan: на ${today} нет approved-новостей, строку не добавляю`);
-  }
+  // ВАЖНО: раньше здесь был автовставка "новость" в ContentPlan на сегодня,
+  // если день пустой — это приводило к посторонним, незапланированным постам
+  // в канале мимо панели/недельного расписания. Планирование теперь только
+  // вручную через панель ("План на след. неделю" или "+ Добавить в план") —
+  // collect.ts только собирает и оценивает новости, план не трогает.
 }
 
 main().catch((e) => {
