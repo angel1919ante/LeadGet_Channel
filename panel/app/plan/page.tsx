@@ -62,6 +62,15 @@ function weekStart(date: string): Date | null {
   return start;
 }
 
+// Понедельник текущей недели (по локальному времени клиента) — граница
+// "текущая + следующая неделя видны, остальное в архив".
+function currentWeekStart(): Date {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+}
+
 function weekLabel(start: Date): string {
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
@@ -202,6 +211,7 @@ export default function PlanPage() {
   const [creating, setCreating] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generateNote, setGenerateNote] = useState<string | null>(null);
+  const [showArchive, setShowArchive] = useState(false);
 
   const load = () => {
     fetch('/api/plan').then((r) => r.json()).then((res) => {
@@ -325,6 +335,19 @@ export default function PlanPage() {
     (newType === 'фича' && newFeatureTitle)
   );
 
+  // По умолчанию видны только текущая и следующая неделя — старые посты не
+  // нужны на виду каждый день, но остаются доступны через "Архив".
+  const curWeekStart = currentWeekStart();
+  const nextWeekStart = new Date(curWeekStart);
+  nextWeekStart.setDate(curWeekStart.getDate() + 7);
+  const inVisibleRange = (dateStr: string) => {
+    const s = weekStart(dateStr);
+    if (!s) return true;
+    return s.getTime() >= curWeekStart.getTime() && s.getTime() <= nextWeekStart.getTime();
+  };
+  const visibleRows = rows ? (showArchive ? rows : rows.filter((r) => inVisibleRange(r.date))) : null;
+  const archivedCount = rows ? rows.length - (rows.filter((r) => inVisibleRange(r.date)).length) : 0;
+
   return (
     <>
       <div className="page-head">
@@ -333,6 +356,11 @@ export default function PlanPage() {
           <p className="sub">{rows ? `${rows.length} постов запланировано` : 'Загрузка…'}</p>
         </div>
         <div className="row" style={{ gap: 10 }}>
+          {archivedCount > 0 && (
+            <button className="btn ghost" onClick={() => setShowArchive((v) => !v)}>
+              {showArchive ? 'Скрыть архив' : `Архив (${archivedCount})`}
+            </button>
+          )}
           <button className="btn ghost" disabled={generating} onClick={generateWeek}>
             {generating ? <span className="spinner" /> : '📅 План на след. неделю'}
           </button>
@@ -404,17 +432,21 @@ export default function PlanPage() {
         </div>
       )}
 
-      {rows && rows.length === 0 && (
-        <div className="empty">План пуст — новости добавляют себя сами, кейсы и фичи занеси через соответствующие разделы, либо жми «Добавить в план» выше.</div>
+      {visibleRows && visibleRows.length === 0 && (
+        <div className="empty">
+          {rows && rows.length > 0
+            ? 'На текущую и следующую неделю ничего нет — загляни в архив выше.'
+            : 'План пуст — новости добавляют себя сами, кейсы и фичи занеси через соответствующие разделы, либо жми «Добавить в план» выше.'}
+        </div>
       )}
 
-      {rows?.map((r, i) => {
+      {visibleRows?.map((r, i) => {
         const info = TYPE_INFO[r.type] ?? { emoji: '📌', label: r.type, color: '' };
         const caseClient = r.type === 'кейс' && r.detail && 'client' in r.detail ? (r.detail as CaseDetail).client : null;
         const fallbackTitle = r.title || caseClient || (r.type === 'кейс' && r.token ? `кейс по токену ${r.token.slice(0, 8)}…` : 'автовыбор — бот решит сам');
 
         const start = weekStart(r.date);
-        const prevStart = i > 0 ? weekStart(rows[i - 1].date) : null;
+        const prevStart = i > 0 ? weekStart(visibleRows[i - 1].date) : null;
         const isNewWeek = start && (!prevStart || start.getTime() !== prevStart.getTime());
 
         const publishState = publishing[r.rowNumber];
