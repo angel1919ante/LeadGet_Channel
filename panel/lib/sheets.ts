@@ -113,17 +113,42 @@ export async function appendPlanRow(row: {
 
 export async function setPlanRow(
   rowNumber: number,
-  patch: { title?: string; status?: string; data?: string },
+  patch: { date?: string; type?: string; title?: string; token?: string; status?: string; data?: string; post?: string },
 ): Promise<void> {
   const sheets = getClient();
   const data: sheets_v4.Schema$ValueRange[] = [];
+  if (patch.date !== undefined) data.push({ range: `${CP_SHEET}!A${rowNumber}`, values: [[patch.date]] });
+  if (patch.type !== undefined) data.push({ range: `${CP_SHEET}!B${rowNumber}`, values: [[patch.type]] });
   if (patch.title !== undefined) data.push({ range: `${CP_SHEET}!C${rowNumber}`, values: [[patch.title]] });
+  if (patch.token !== undefined) data.push({ range: `${CP_SHEET}!D${rowNumber}`, values: [[patch.token]] });
   if (patch.data !== undefined) data.push({ range: `${CP_SHEET}!E${rowNumber}`, values: [[patch.data]] });
   if (patch.status !== undefined) data.push({ range: `${CP_SHEET}!F${rowNumber}`, values: [[patch.status]] });
+  if (patch.post !== undefined) data.push({ range: `${CP_SHEET}!G${rowNumber}`, values: [[patch.post]] });
   if (data.length === 0) return;
   await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId: getSheetId(),
     requestBody: { valueInputOption: 'RAW', data },
+  });
+}
+
+// Физически удаляет строку из ContentPlan (сдвигает нижние вверх). Нужно,
+// когда строка плана лишняя/ошибочная — очистка значений оставила бы пустую
+// строку, которая ломает нумерацию и мозолит глаза в панели.
+export async function deletePlanRow(rowNumber: number): Promise<void> {
+  const sheets = getClient();
+  const spreadsheetId = getSheetId();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheetId = meta.data.sheets?.find((s) => s.properties?.title === CP_SHEET)?.properties?.sheetId;
+  if (sheetId === undefined || sheetId === null) throw new Error(`лист ${CP_SHEET} не найден`);
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{
+        deleteDimension: {
+          range: { sheetId, dimension: 'ROWS', startIndex: rowNumber - 1, endIndex: rowNumber },
+        },
+      }],
+    },
   });
 }
 

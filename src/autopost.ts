@@ -176,11 +176,21 @@ async function main(): Promise<void> {
   // FORCE_ROW: публикация конкретной строки плана по кнопке "Опубликовать
   // сейчас" в панели — вне очереди, независимо от даты строки.
   const forceRow = process.env.FORCE_ROW ? Number(process.env.FORCE_ROW) : undefined;
+  // DRAFT_ROW: сгенерировать текст в черновик (кнопка "Черновик" в панели),
+  // НЕ публикуя — чтобы можно было прочитать и поправить руками до выхода.
+  const draftRow = process.env.DRAFT_ROW ? Number(process.env.DRAFT_ROW) : undefined;
 
   const plans = await getContentPlanRows();
   let planRow: ContentPlanRow | undefined;
 
-  if (forceRow !== undefined) {
+  if (draftRow !== undefined) {
+    planRow = plans.find((r) => r.rowNumber === draftRow);
+    if (!planRow) {
+      console.log(`DRAFT_ROW=${draftRow}: строка не найдена в ContentPlan`);
+      return;
+    }
+    console.log(`DRAFT_ROW=${draftRow}: генерируем черновик без публикации`);
+  } else if (forceRow !== undefined) {
     planRow = plans.find((r) => r.rowNumber === forceRow);
     if (!planRow) {
       console.log(`FORCE_ROW=${forceRow}: строка не найдена в ContentPlan`);
@@ -190,12 +200,17 @@ async function main(): Promise<void> {
   } else {
     const today = todayDMY();
     console.log(`autopost: today=${today}`);
-    planRow = plans.find((r) => r.date === today && r.status === 'approved');
+    planRow = plans.find((r) => r.date === today && ['approved', 'draft'].includes(r.status));
     if (!planRow) {
-      console.log(`нет approved строки в ContentPlan на ${today}`);
+      console.log(`нет approved/draft строки в ContentPlan на ${today}`);
       return;
     }
   }
+
+  const isDraftMode = draftRow !== undefined;
+  // Готовый (возможно отредактированный вручную) черновик публикуем как есть —
+  // не перегенерируем, иначе правки пользователя молча потеряются.
+  const useExistingDraft = !isDraftMode && planRow.status === 'draft' && !!planRow.post.trim();
 
   console.log(`plan: type=${planRow.type} title="${planRow.title}"`);
 
@@ -209,19 +224,30 @@ async function main(): Promise<void> {
 
   try {
     if (planRow.type === 'новость') {
-      const news = await handleNews(planRow);
-      // Записываем в план выбранную новость — чтобы было видно саммари и ссылку
-      await updateContentPlanRow(planRow.rowNumber, {
-        title: news.title,
-        data: JSON.stringify({ link: news.link, summary: news.summary }),
-      });
-      rawPost = news.rawPost;
-      sourceRef = news.link;
-      newsRowNumber = news.rowNumber;
+      if (useExistingDraft) {
+        rawPost = planRow.post;
+        let planData: Record<string, unknown> = {};
+        try { planData = planRow.data ? JSON.parse(planRow.data) : {}; } catch { /* пусто */ }
+        sourceRef = String(planData.link ?? `news:${planRow.title}`);
+        // newsRow сохранён на этапе черновика — иначе эта же новость из листа
+        // News осталась бы approved и могла уйти во второй пост повторно.
+        if (typeof planData.newsRow === 'number') newsRowNumber = planData.newsRow;
+      } else {
+        const news = await handleNews(planRow);
+        // Записываем в план выбранную новость — чтобы было видно саммари и ссылку
+        await updateContentPlanRow(planRow.rowNumber, {
+          title: news.title,
+          data: JSON.stringify({ link: news.link, summary: news.summary, newsRow: news.rowNumber }),
+        });
+        rawPost = news.rawPost;
+        sourceRef = news.link;
+        newsRowNumber = news.rowNumber;
+      }
     } else if (planRow.type === 'кейс') {
       if (!planRow.token) throw new Error('Недостаточно информации: для кейса нужен Токен в ContentPlan');
-      const { postText, board } = await generateCase(planRow);
-      rawPost = postText;
+      // Борд с цифрами нужен всегда, текст — только если черновика ещё нет.
+      const { postText, board } = await generateCase(planRow, useExistingDraft);
+      rawPost = useExistingDraft ? planRow.post : postText;
       sourceRef = `leadget:${planRow.token}`;
 
       // Переключатель "с фото / без фото" — data.withPhoto в ContentPlan.Данные,
@@ -238,13 +264,22 @@ async function main(): Promise<void> {
         forceNoImage = true;
       }
     } else if (planRow.type === 'фича') {
-      rawPost = await handleFeature(planRow);
+      rawPost = useExistingDraft ? planRow.post : await handleFeature(planRow);
       sourceRef = `feature:${planRow.title}`;
     } else {
       throw new Error(`неизвестный тип: ${planRow.type}`);
     }
 
-    const formatted = await formatPost(rawPost);
+    // Уже отформатированный черновик не прогоняем через formatPost повторно —
+    // иначе HTML-теги из него экранируются/ломаются на второй проход.
+    const formatted = useExistingDraft ? rawPost : await formatPost(rawPost);
+
+    if (isDraftMode) {
+      await updateContentPlanRow(planRow.rowNumber, { status: 'draft', post: formatted });
+      console.log(`draft ready for row ${planRow.rowNumber} (${formatted.length} симв.), не публикуем`);
+      return;
+    }
+
     const postUrl = await postAndRecord(planRow.type, formatted, sourceRef, boardImage, forceNoImage);
     await updateContentPlanRow(planRow.rowNumber, { status: 'posted', post: formatted, postUrl });
     if (newsRowNumber !== undefined) {

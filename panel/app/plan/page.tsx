@@ -212,6 +212,10 @@ export default function PlanPage() {
   const [generating, setGenerating] = useState(false);
   const [generateNote, setGenerateNote] = useState<string | null>(null);
   const [showArchive, setShowArchive] = useState(false);
+  const [editingRow, setEditingRow] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<{ date: string; type: string; title: string; post: string }>({ date: '', type: '', title: '', post: '' });
+  const [savingRow, setSavingRow] = useState<number | null>(null);
+  const [drafting, setDrafting] = useState<Record<number, 'busy' | 'queued'>>({});
 
   const load = () => {
     fetch('/api/plan').then((r) => r.json()).then((res) => {
@@ -256,6 +260,67 @@ export default function PlanPage() {
       body: JSON.stringify({ rowNumber }),
     });
     setDeleting((p) => ({ ...p, [rowNumber]: res.ok ? 'queued' : undefined as never }));
+  };
+
+  // Дата в плане хранится DD.MM.YYYY, <input type="date"> хочет YYYY-MM-DD.
+  const toISO = (dmy: string) => {
+    const [d, m, y] = dmy.split('.');
+    return d && m && y ? `${y}-${m}-${d}` : '';
+  };
+
+  const openEdit = (r: PlanRow) => {
+    if (editingRow === r.rowNumber) {
+      setEditingRow(null);
+      return;
+    }
+    setEditDraft({ date: toISO(r.date), type: r.type, title: r.title, post: stripHtml(r.post) });
+    setEditingRow(r.rowNumber);
+  };
+
+  const saveEdit = async (r: PlanRow) => {
+    setSavingRow(r.rowNumber);
+    const patch: Record<string, unknown> = { rowNumber: r.rowNumber };
+    const newDate = editDraft.date ? toDMY(editDraft.date) : r.date;
+    if (newDate !== r.date) patch.date = newDate;
+    if (editDraft.type !== r.type) patch.type = editDraft.type;
+    if (editDraft.title !== r.title) patch.title = editDraft.title;
+    // Текст правим только если он уже есть (черновик) — иначе публиковать
+    // нечего и правка бессмысленна. Пустой пост не затираем.
+    if (r.post && editDraft.post.trim() && editDraft.post !== stripHtml(r.post)) {
+      patch.post = editDraft.post;
+      patch.status = 'draft';
+    }
+    await fetch('/api/plan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    setSavingRow(null);
+    setEditingRow(null);
+    load();
+  };
+
+  const removeRow = async (r: PlanRow) => {
+    if (!confirm(`Удалить строку плана на ${r.date}? Действие необратимо, строка исчезнет из таблицы.`)) return;
+    setSavingRow(r.rowNumber);
+    await fetch('/api/plan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rowNumber: r.rowNumber, remove: true }),
+    });
+    setSavingRow(null);
+    setEditingRow(null);
+    load();
+  };
+
+  const makeDraft = async (rowNumber: number) => {
+    setDrafting((p) => ({ ...p, [rowNumber]: 'busy' }));
+    const res = await fetch('/api/plan/draft', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rowNumber }),
+    });
+    setDrafting((p) => ({ ...p, [rowNumber]: res.ok ? 'queued' : undefined as never }));
   };
 
   const openCaseEdit = (r: PlanRow) => {
@@ -458,6 +523,8 @@ export default function PlanPage() {
 
         const isEditingCase = editingCase === r.rowNumber;
         const caseFields = caseFieldsByRow[r.rowNumber];
+        const isEditingRow = editingRow === r.rowNumber;
+        const draftState = drafting[r.rowNumber];
 
         return (
           <div key={r.rowNumber}>
@@ -484,7 +551,7 @@ export default function PlanPage() {
                 </div>
                 <Detail r={r} />
                 <CaseAssetsAlert r={r} />
-                {r.status === 'posted' && r.post && (() => {
+                {(r.status === 'posted' || r.status === 'draft') && r.post && (() => {
                   const clean = stripHtml(r.post).replace(/\s+/g, ' ').trim();
                   return <p className="plan-card-post">{clean.slice(0, 220)}{clean.length > 220 ? '…' : ''}</p>;
                 })()}
@@ -516,6 +583,25 @@ export default function PlanPage() {
                     </button>
                   )}
 
+                  {r.status !== 'posted' && (
+                    <button
+                      className="btn ghost"
+                      disabled={draftState === 'busy'}
+                      onClick={() => makeDraft(r.rowNumber)}
+                    >
+                      {draftState === 'busy' ? <span className="spinner" /> : (r.post ? 'Перегенерировать' : 'Черновик')}
+                    </button>
+                  )}
+                  {draftState === 'queued' && (
+                    <span className="publish-queued-note">Черновик готовится — обнови страницу через минуту</span>
+                  )}
+
+                  {r.status !== 'posted' && (
+                    <button className="btn ghost" onClick={() => openEdit(r)}>
+                      {isEditingRow ? 'Свернуть' : '✏️ Редактировать'}
+                    </button>
+                  )}
+
                   {canPublish && (
                     <button
                       className="btn approve publish-now"
@@ -542,6 +628,64 @@ export default function PlanPage() {
                     <span className="publish-queued-note">Удаление отправлено — обновится в течение минуты</span>
                   )}
                 </div>
+
+                {isEditingRow && (
+                  <div className="case-edit-card">
+                    <label className="field-label">Дата</label>
+                    <input
+                      type="date"
+                      className="field-input"
+                      value={editDraft.date}
+                      onChange={(e) => setEditDraft((d) => ({ ...d, date: e.target.value }))}
+                    />
+
+                    <label className="field-label">Тип</label>
+                    <select
+                      className="field-input"
+                      value={editDraft.type}
+                      onChange={(e) => setEditDraft((d) => ({ ...d, type: e.target.value }))}
+                    >
+                      <option value="новость">Новость</option>
+                      <option value="кейс">Кейс</option>
+                      <option value="фича">Фича</option>
+                    </select>
+
+                    <label className="field-label">Заголовок</label>
+                    <input
+                      className="field-input"
+                      value={editDraft.title}
+                      onChange={(e) => setEditDraft((d) => ({ ...d, title: e.target.value }))}
+                      placeholder="пусто — бот подставит сам"
+                    />
+
+                    {r.post ? (
+                      <>
+                        <label className="field-label">Текст поста</label>
+                        <textarea
+                          className="field-input"
+                          rows={16}
+                          value={editDraft.post}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, post: e.target.value }))}
+                        />
+                        <p className="field-hint">Сохранишь — в канал уйдёт именно этот текст, без перегенерации.</p>
+                      </>
+                    ) : (
+                      <p className="field-hint" style={{ marginTop: 12 }}>
+                        Текста ещё нет — нажми «Черновик», чтобы бот его написал, потом сможешь поправить здесь.
+                      </p>
+                    )}
+
+                    <div className="row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
+                      <button className="btn approve" disabled={savingRow === r.rowNumber} onClick={() => saveEdit(r)}>
+                        {savingRow === r.rowNumber ? <span className="spinner" /> : 'Сохранить'}
+                      </button>
+                      <button className="btn ghost" onClick={() => setEditingRow(null)}>Отмена</button>
+                      <button className="btn reject" disabled={savingRow === r.rowNumber} onClick={() => removeRow(r)}>
+                        Удалить строку
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {isEditingCase && caseFields && (
                   <div className="case-edit-card">

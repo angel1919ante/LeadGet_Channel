@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { appendPlanRow, getCaseRows, getFeatureRows, getNewsRows, getPlanRows, setPlanRow } from '@/lib/sheets';
+import { appendPlanRow, deletePlanRow, getCaseRows, getFeatureRows, getNewsRows, getPlanRows, setPlanRow } from '@/lib/sheets';
 
 export async function GET() {
   const [rows, cases, features, news] = await Promise.all([
@@ -60,7 +60,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const { rowNumber, status, title, withPhoto, caseData } = body;
+  const { rowNumber, status, title, withPhoto, caseData, remove, date, type, token, post } = body;
+
+  if (remove) {
+    await deletePlanRow(rowNumber);
+    return NextResponse.json({ ok: true });
+  }
 
   if (withPhoto !== undefined || caseData) {
     // Мержим в существующий JSON строки, чтобы не потерять остальные поля.
@@ -74,6 +79,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  await setPlanRow(rowNumber, { status, title });
+  await setPlanRow(rowNumber, { status, title, date, type, token, post });
   return NextResponse.json({ ok: true });
 }
