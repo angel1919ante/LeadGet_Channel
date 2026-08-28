@@ -80,9 +80,19 @@ export async function fetchTelegramChannel(
     .map((m) => ({ id: m.id, text: m.text, date: m.date }));
 }
 
+// GramJS держит фоновый update-loop, который на TIMEOUT бесконечно ретраится
+// и не даёт process'у выйти после disconnect() — скрипт зависает часами
+// (реальный инцидент: job "queued" 3.5 часа при уже готовой работе). Эти
+// скрипты одноразовые (CLI job), после этой функции ничего больше не
+// выполняется — форсируем exit с таймаутом на сам disconnect.
 export async function disconnectMTProto(): Promise<void> {
   if (_client) {
-    await _client.disconnect();
+    const client = _client;
     _client = null;
+    await Promise.race([
+      client.disconnect().catch(() => {}),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
   }
+  process.exit(0);
 }

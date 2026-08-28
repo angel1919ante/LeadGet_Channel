@@ -3,6 +3,7 @@ import { callLLM } from './llm.ts';
 import { postPrompt } from './prompts.ts';
 import { postToChannel } from './telegram.ts';
 import { loadToneSamples } from './toneSamples.ts';
+import { disconnectMTProto } from './mtproto.ts';
 import type { Candidate, Source } from './types.ts';
 
 async function main(): Promise<void> {
@@ -36,7 +37,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => disconnectMTProto());

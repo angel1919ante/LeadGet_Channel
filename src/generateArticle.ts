@@ -5,6 +5,7 @@ import { getAllRows, appendArticles } from './sheets.ts';
 import { callLLM } from './llm.ts';
 import { articlePrompt, articlePromptFromTopic } from './articlePrompts.ts';
 import { loadToneSamples } from './toneSamples.ts';
+import { disconnectMTProto } from './mtproto.ts';
 import type { Platform } from './articleTypes.ts';
 import type { Candidate, Source } from './types.ts';
 
@@ -47,7 +48,9 @@ async function main(): Promise<void> {
   console.log(`generated article: platform=${platform} title="${sourceTitle.slice(0, 50)}"`);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => disconnectMTProto());

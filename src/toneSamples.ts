@@ -1,4 +1,4 @@
-import { fetchTelegramChannel, disconnectMTProto } from './mtproto.ts';
+import { fetchTelegramChannel } from './mtproto.ts';
 
 export interface ToneSamples {
   ours: string[];    // LeadGet_channel — основной голос
@@ -8,7 +8,11 @@ export interface ToneSamples {
 const OUR_CHANNEL = 'Leadget_channel';
 const LEARN_CHANNELS = ['molyanov_blog', '+RTqYchZh5C81OTJi'];
 
-// Берём тексты постов: 5 наших + 3 обучающих (достаточно для промпта)
+// Берём тексты постов: 5 наших + 3 обучающих (достаточно для промпта).
+// Не отключаем MTProto-клиент здесь — это середина скрипта, не конец
+// (вызывающий код может ещё постить в Telegram тем же клиентом). Клиент
+// закрывает вызывающий скрипт через disconnectMTProto() в своём финальном
+// .finally() (см. mtproto.ts — там же принудительный process.exit).
 export async function loadToneSamples(): Promise<ToneSamples> {
   if (!process.env.TELEGRAM_SESSION) {
     return { ours: [], learn: [] };
@@ -35,7 +39,5 @@ export async function loadToneSamples(): Promise<ToneSamples> {
   } catch (e) {
     console.error('toneSamples fetch failed:', e);
     return { ours: [], learn: [] };
-  } finally {
-    await disconnectMTProto();
   }
 }
