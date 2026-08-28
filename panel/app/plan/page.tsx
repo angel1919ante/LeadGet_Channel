@@ -89,6 +89,17 @@ function readWithPhoto(dataStr: string): boolean {
   }
 }
 
+// "Выложено" — пост уже перенесён руками в боевой канал, в рабочем списке он
+// больше не нужен, уезжает в архив независимо от даты.
+function readArchived(dataStr: string): boolean {
+  try {
+    const d = dataStr ? JSON.parse(dataStr) : {};
+    return d.archived === true;
+  } catch {
+    return false;
+  }
+}
+
 interface CaseAssets { withPhoto: boolean; boardPosted?: boolean }
 
 function readCaseAssets(dataStr: string): CaseAssets {
@@ -315,6 +326,17 @@ export default function PlanPage() {
     load();
   };
 
+  const setArchived = async (rowNumber: number, archived: boolean) => {
+    setSavingRow(rowNumber);
+    await fetch('/api/plan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rowNumber, archived }),
+    });
+    setSavingRow(null);
+    load();
+  };
+
   // Перетаскивание карточки на другую — меняем их датами местами.
   const swapRows = async (fromRow: number, toRow: number) => {
     if (fromRow === toRow) return;
@@ -425,8 +447,9 @@ export default function PlanPage() {
     if (!s) return true;
     return s.getTime() >= curWeekStart.getTime() && s.getTime() <= nextWeekStart.getTime();
   };
-  const visibleRows = rows ? (showArchive ? rows : rows.filter((r) => inVisibleRange(r.date))) : null;
-  const archivedCount = rows ? rows.length - (rows.filter((r) => inVisibleRange(r.date)).length) : 0;
+  const inWorkList = (r: PlanRow) => inVisibleRange(r.date) && !readArchived(r.data);
+  const visibleRows = rows ? (showArchive ? rows : rows.filter(inWorkList)) : null;
+  const archivedCount = rows ? rows.length - rows.filter(inWorkList).length : 0;
 
   return (
     <>
@@ -534,6 +557,7 @@ export default function PlanPage() {
         const publishState = publishing[r.rowNumber];
         const canPublish = r.status !== 'posted' && publishState !== 'queued';
         const withPhoto = readWithPhoto(r.data);
+        const isArchived = readArchived(r.data);
 
         const deleteState = deleting[r.rowNumber];
         const canDelete = r.status === 'posted' && r.postUrl && deleteState !== 'queued';
@@ -576,6 +600,7 @@ export default function PlanPage() {
                 <div className="plan-card-top">
                   <span className="plan-card-type">{info.label}</span>
                   <span className={`status ${r.status || 'draft'}`}>{r.status || 'draft'}</span>
+                  {isArchived && <span className="status approved">выложено</span>}
                 </div>
                 <div className="plan-card-title-row">
                   <div className={`plan-card-title ${r.title ? '' : 'empty-title'}`}>{fallbackTitle}</div>
@@ -649,6 +674,27 @@ export default function PlanPage() {
                   )}
                   {publishState === 'queued' && (
                     <span className="publish-queued-note">Отправлено — появится в канале в течение минуты</span>
+                  )}
+
+                  {r.status === 'posted' && !isArchived && (
+                    <button
+                      className="btn approve"
+                      disabled={savingRow === r.rowNumber}
+                      onClick={() => setArchived(r.rowNumber, true)}
+                      title="Перенёс в боевой канал — убрать из рабочего списка"
+                    >
+                      {savingRow === r.rowNumber ? <span className="spinner" /> : '✅ Выложено'}
+                    </button>
+                  )}
+
+                  {isArchived && (
+                    <button
+                      className="btn ghost"
+                      disabled={savingRow === r.rowNumber}
+                      onClick={() => setArchived(r.rowNumber, false)}
+                    >
+                      {savingRow === r.rowNumber ? <span className="spinner" /> : 'Вернуть из архива'}
+                    </button>
                   )}
 
                   {canDelete && (

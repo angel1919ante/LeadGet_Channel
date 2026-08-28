@@ -60,7 +60,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const { rowNumber, status, title, withPhoto, caseData, remove, swapWith, date, type, token, post } = body;
+  const { rowNumber, status, title, withPhoto, caseData, archived, remove, swapWith, date, type, token, post } = body;
 
   if (remove) {
     await deletePlanRow(rowNumber);
@@ -79,13 +79,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  if (withPhoto !== undefined || caseData) {
+  if (withPhoto !== undefined || caseData || archived !== undefined) {
     // Мержим в существующий JSON строки, чтобы не потерять остальные поля.
     const rows = await getPlanRows();
     const row = rows.find((r) => r.rowNumber === rowNumber);
     let data: Record<string, unknown> = {};
     try { data = row?.data ? JSON.parse(row.data) : {}; } catch { /* оставляем пустым, если не JSON */ }
     if (withPhoto !== undefined) data.withPhoto = withPhoto;
+    // archived — "выложено в боевой канал руками", строка уходит в архив
+    // независимо от даты. Отдельно от status, тот про публикацию ботом.
+    if (archived !== undefined) data.archived = archived;
     if (caseData) Object.assign(data, caseData);
     await setPlanRow(rowNumber, { data: JSON.stringify(data) });
     return NextResponse.json({ ok: true });
