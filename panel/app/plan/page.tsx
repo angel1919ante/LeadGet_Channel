@@ -216,6 +216,8 @@ export default function PlanPage() {
   const [editDraft, setEditDraft] = useState<{ date: string; type: string; title: string; post: string }>({ date: '', type: '', title: '', post: '' });
   const [savingRow, setSavingRow] = useState<number | null>(null);
   const [drafting, setDrafting] = useState<Record<number, 'busy' | 'queued'>>({});
+  const [dragRow, setDragRow] = useState<number | null>(null);
+  const [dragOverRow, setDragOverRow] = useState<number | null>(null);
 
   const load = () => {
     fetch('/api/plan').then((r) => r.json()).then((res) => {
@@ -310,6 +312,19 @@ export default function PlanPage() {
     });
     setSavingRow(null);
     setEditingRow(null);
+    load();
+  };
+
+  // Перетаскивание карточки на другую — меняем их датами местами.
+  const swapRows = async (fromRow: number, toRow: number) => {
+    if (fromRow === toRow) return;
+    setSavingRow(fromRow);
+    await fetch('/api/plan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rowNumber: fromRow, swapWith: toRow }),
+    });
+    setSavingRow(null);
     load();
   };
 
@@ -418,7 +433,9 @@ export default function PlanPage() {
       <div className="page-head">
         <div>
           <h1>Контент-план</h1>
-          <p className="sub">{rows ? `${rows.length} постов запланировано` : 'Загрузка…'}</p>
+          <p className="sub">
+            {rows ? `${rows.length} постов запланировано · перетащи карточку на другую, чтобы поменять местами` : 'Загрузка…'}
+          </p>
         </div>
         <div className="row" style={{ gap: 10 }}>
           {archivedCount > 0 && (
@@ -529,8 +546,27 @@ export default function PlanPage() {
         return (
           <div key={r.rowNumber}>
             {isNewWeek && start && <div className="week-header">{weekLabel(start)}</div>}
-            <div className={`plan-card ${info.color}`}>
+            <div
+              className={`plan-card ${info.color} ${dragOverRow === r.rowNumber && dragRow !== r.rowNumber ? 'drag-over' : ''} ${dragRow === r.rowNumber ? 'dragging' : ''}`}
+              draggable={r.status !== 'posted'}
+              onDragStart={() => setDragRow(r.rowNumber)}
+              onDragEnd={() => { setDragRow(null); setDragOverRow(null); }}
+              onDragOver={(e) => {
+                if (dragRow === null || r.status === 'posted') return;
+                e.preventDefault();
+                setDragOverRow(r.rowNumber);
+              }}
+              onDragLeave={() => setDragOverRow((cur) => (cur === r.rowNumber ? null : cur))}
+              onDrop={(e) => {
+                e.preventDefault();
+                const from = dragRow;
+                setDragRow(null);
+                setDragOverRow(null);
+                if (from !== null && r.status !== 'posted') swapRows(from, r.rowNumber);
+              }}
+            >
               <div className="plan-card-date">
+                {r.status !== 'posted' && <span className="plan-card-grip" title="Перетащи, чтобы поменять местами">⠿</span>}
                 <span className="plan-card-weekday">{weekday(r.date)}</span>
                 <span className="plan-card-daynum">{r.date.slice(0, 2)}</span>
                 <span className="plan-card-month">{r.date.slice(3, 5)}</span>

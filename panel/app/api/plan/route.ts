@@ -60,10 +60,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const { rowNumber, status, title, withPhoto, caseData, remove, date, type, token, post } = body;
+  const { rowNumber, status, title, withPhoto, caseData, remove, swapWith, date, type, token, post } = body;
 
   if (remove) {
     await deletePlanRow(rowNumber);
+    return NextResponse.json({ ok: true });
+  }
+
+  // Перестановка местами: меняем датами две строки плана — порядок в панели
+  // определяется датой, так что обмен дат = обмен позициями.
+  if (swapWith) {
+    const rows = await getPlanRows();
+    const a = rows.find((r) => r.rowNumber === rowNumber);
+    const b = rows.find((r) => r.rowNumber === swapWith);
+    if (!a || !b) return NextResponse.json({ error: 'строка не найдена' }, { status: 404 });
+    await setPlanRow(a.rowNumber, { date: b.date });
+    await setPlanRow(b.rowNumber, { date: a.date });
     return NextResponse.json({ ok: true });
   }
 

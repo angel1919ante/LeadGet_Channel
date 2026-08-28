@@ -288,7 +288,21 @@ h1 { font-size: 26px; letter-spacing: -0.01em; margin: 0 0 6px; }
   border-radius: 14px;
   padding: 16px 20px;
   margin-bottom: 12px;
+  transition: border-color .15s, opacity .15s;
 }
+.plan-card[draggable="true"] { cursor: grab; }
+.plan-card.dragging { opacity: 0.4; cursor: grabbing; }
+.plan-card.drag-over { border-color: var(--green); border-style: dashed; }
+
+.plan-card-grip {
+  font-size: 15px;
+  color: var(--ink-soft);
+  opacity: 0.5;
+  line-height: 1;
+  margin-bottom: 2px;
+  user-select: none;
+}
+.plan-card:hover .plan-card-grip { opacity: 1; }
 
 .plan-card-date {
   display: flex;
