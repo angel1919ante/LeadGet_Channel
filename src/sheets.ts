@@ -13,7 +13,7 @@ export interface SheetRow {
   link: string;
   rating: number;
   status: string;
-  article: string; // 'нет' | 'habr' | 'vc' | 'dzen' | 'x' | 'все'
+  article: string; // 'нет' | 'habr' | 'vc' | 'dzen' | 'x' | 'tenchat' | 'rbc' | 'все'
 }
 
 function getClient(): sheets_v4.Sheets {
@@ -97,6 +97,8 @@ async function formatColumns(sheets: sheets_v4.Sheets, spreadsheetId: string): P
                   { userEnteredValue: 'vc' },
                   { userEnteredValue: 'dzen' },
                   { userEnteredValue: 'x' },
+                  { userEnteredValue: 'tenchat' },
+                  { userEnteredValue: 'rbc' },
                   { userEnteredValue: 'все' },
                 ],
               },

@@ -1,4 +1,4 @@
-export type Platform = 'habr' | 'vc' | 'dzen' | 'x';
+export type Platform = 'habr' | 'vc' | 'dzen' | 'x' | 'tenchat' | 'rbc';
 
 export interface ArticleCandidate {
   sourceUrl: string;

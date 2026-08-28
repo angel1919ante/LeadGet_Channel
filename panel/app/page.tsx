@@ -40,6 +40,8 @@ const ARTICLE_PLATFORMS = [
   { key: 'vc', label: 'VC.ru' },
   { key: 'dzen', label: 'Дзен' },
   { key: 'x', label: 'X' },
+  { key: 'tenchat', label: 'TenChat' },
+  { key: 'rbc', label: 'РБК' },
 ];
 
 export default function NewsPage() {

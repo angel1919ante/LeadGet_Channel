@@ -17,6 +17,8 @@ const PLATFORMS = [
   { key: 'vc', label: 'VC.ru' },
   { key: 'dzen', label: 'Дзен' },
   { key: 'x', label: 'X' },
+  { key: 'tenchat', label: 'TenChat' },
+  { key: 'rbc', label: 'РБК' },
 ];
 
 const CHANNEL_LINK = 'https://t.me/LeadGet_reviews';

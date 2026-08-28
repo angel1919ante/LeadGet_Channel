@@ -15,9 +15,11 @@ const PLATFORM_LABEL: Record<Platform, string> = {
   vc: 'VC.RU',
   dzen: 'ДЗЕН',
   x: 'X (TWITTER)',
+  tenchat: 'TENCHAT',
+  rbc: 'РБК',
 };
 
-const ALL_PLATFORMS: Platform[] = ['habr', 'vc', 'dzen', 'x'];
+const ALL_PLATFORMS: Platform[] = ['habr', 'vc', 'dzen', 'x', 'tenchat', 'rbc'];
 
 function platformsFor(article: string): Platform[] {
   const v = article.trim().toLowerCase();
