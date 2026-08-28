@@ -44,6 +44,23 @@ function pct(part: number, total: number): string {
   return `${((part / total) * 100).toFixed(1)}%`;
 }
 
+// Склонение числительных: "114 лидов", "3 лида", "1 лид" — стандартное
+// правило (11-14 всегда родительный мн.ч., иначе по последней цифре).
+function pluralRu(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
+function leadsPhrase(n: number): string {
+  return n % 10 === 1 && n % 100 !== 11
+    ? 'квалифицированный лид'
+    : `квалифицированных ${pluralRu(n, 'лид', 'лида', 'лидов')}`;
+}
+
 // Пользователь явно попросил: в реальных постах "отправок" всегда должно
 // выглядеть как объём в диапазоне 2000-4000, неровное число — остальные
 // цифры пересчитываются по тем же процентам конверсии, что и реальные.
@@ -64,8 +81,10 @@ function scaleSummary(s: CampaignSummary): CampaignSummary {
 }
 
 // Формат-эталон (зафиксирован пользователем): цифра сначала моноширинным
-// (<code>, не <b>), текст после, без "Рассылка:"-префиксов. Пачкой —
-// без пустых строк между строками (formatPost это защищает через [STACK]).
+// (<code>, не <b>), текст после, проценты в скобках тоже моноширинным.
+// Пачкой — без пустых строк между строками (formatPost это защищает через
+// [STACK]), но с пустой строкой ПЕРЕД блоком — отделяет его от заголовка
+// "Итоги за период:" (ведущий \n вне маркеров [STACK], trim() его не съест).
 function buildResultsString(s: CampaignSummary, price?: string): string {
   if (!s.sent) {
     return 'нет данных о рассылке';
@@ -74,14 +93,14 @@ function buildResultsString(s: CampaignSummary, price?: string): string {
   const convPct = pct(s.leads, s.sent).replace('%', '');
 
   const lines = [
-    `<code>${s.sent}</code> сообщений отправлено`,
-    ...(s.read !== undefined ? [`<code>${s.read}</code> прочитали: (${pct(s.read, s.sent)})`] : []),
-    `<code>${s.replied}</code> ответили: (${pct(s.replied, s.sent)})`,
-    `<code>${s.engaged}</code> диалогов: (${pct(s.engaged, s.sent)})`,
-    `<code>${s.leads}</code> квалифицированных лида (${convPct}%)`,
+    `<code>${s.sent}</code> ${pluralRu(s.sent, 'сообщение', 'сообщения', 'сообщений')} отправлено`,
+    ...(s.read !== undefined ? [`<code>${s.read}</code> прочитали: (<code>${pct(s.read, s.sent)}</code>)`] : []),
+    `<code>${s.replied}</code> ответили: (<code>${pct(s.replied, s.sent)}</code>)`,
+    `<code>${s.engaged}</code> ${pluralRu(s.engaged, 'диалог', 'диалога', 'диалогов')}: (<code>${pct(s.engaged, s.sent)}</code>)`,
+    `<code>${s.leads}</code> ${leadsPhrase(s.leads)} (<code>${convPct}%</code>)`,
     ...(price ? [`<code>${price}</code> ₽ цена квал. лида`] : []),
   ].join('\n');
-  return `[STACK]${lines}[/STACK]`;
+  return `\n[STACK]${lines}[/STACK]`;
 }
 
 export interface CaseBoardData {

@@ -56,6 +56,12 @@ export async function sendAlbumAsUser(channelId: string, photos: Buffer[]): Prom
   return first.id;
 }
 
+// Редактирует текст/подпись уже отправленного сообщения (в т.ч. подпись фото).
+export async function editMessageAsUser(channelId: string, messageId: number, htmlText: string): Promise<void> {
+  const client = await getClient();
+  await client.editMessage(channelId, { message: messageId, text: htmlText, parseMode: 'html' });
+}
+
 // Удаляет сообщения из канала по id (revoke: у всех, не только у себя).
 export async function deleteMessagesAsUser(channelId: string, ids: number[]): Promise<void> {
   const client = await getClient();
