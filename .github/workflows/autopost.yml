@@ -23,6 +23,7 @@ on:
           - learn
           - gen-pen-pose
           - generate-article
+          - review-article
       test_case_token:
         description: 'Токен кампании для теста (только для test-case)'
         required: false
@@ -64,7 +65,11 @@ on:
         required: false
         default: ''
       platform:
-        description: 'Площадка статьи: habr/vc/dzen/x (только для generate-article)'
+        description: 'Площадка статьи: habr/vc/dzen/x/tenchat/rbc (только для generate-article)'
+        required: false
+        default: ''
+      article_row:
+        description: 'Номер строки Articles для проверки в review-канале (только для review-article)'
         required: false
         default: ''
 
@@ -290,6 +295,24 @@ jobs:
           NEWS_ROW: ${{ github.event.inputs.news_row }}
           TOPIC: ${{ github.event.inputs.topic }}
           PLATFORM: ${{ github.event.inputs.platform }}
+
+  review-article:
+    if: github.event.inputs.job == 'review-article'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm run review-article
+        env:
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          ARTICLE_ROW: ${{ github.event.inputs.article_row }}
 
   post:
     if: github.event.inputs.job == 'post' || github.event_name == 'schedule'
