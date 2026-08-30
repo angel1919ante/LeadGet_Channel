@@ -3,13 +3,16 @@ import type { Candidate } from './types.ts';
 
 const parser = new Parser();
 
-// Хабы, которые реально существуют и релевантны теме канала
-const HABR_HUBS = ['artificial_intelligence', 'machine_learning'];
+// MARKETING_HUBS — реально по теме канала (маркетинг/реклама), берём все
+// статьи без keyword-фильтра, как cossa/vc/rbc. AI_HUBS — общий AI/ML-хаб,
+// тематически шире канала, поэтому дополнительно фильтруем по ключевым
+// словам, чтобы не тащить чистую разработку/матан. Раньше был только
+// AI_HUBS — из-за этого 29-30.08 collect дал 0 новостей два дня подряд:
+// весь пул кандидатов был про LLM/RAG/файн-тюнинг, ничего про маркетинг,
+// LLM-оценка релевантности справедливо резала всё по порогу.
+const MARKETING_HUBS = ['internetmarketing'];
+const AI_HUBS = ['artificial_intelligence', 'machine_learning'];
 
-// Только AI/ML-тематика — этим уже гарантирует выбор хаба, keyword-проверка
-// тут просто подстраховка от случайных кросспостов. Бизнес-релевантность
-// (маркетинг/лидген/продажи) решает LLM-оценка в collect.ts, а не жёсткий
-// regex-фильтр здесь — иначе отсекаем всё до того, как модель успеет оценить.
 // Рейтинг статьи раньше парсили regex'ом со страницы Хабра — вёрстка
 // поменялась, regex молча возвращал 0 и резал 100% кандидатов. Скрейпинг
 // ненадёжен, поэтому просто не фильтруем по рейтингу вообще.
@@ -21,7 +24,7 @@ export async function fetchHabr(): Promise<Candidate[]> {
     'llm', 'машинное обучение', 'machine learning', 'ai-агент', 'ai агент',
   ];
 
-  for (const slug of HABR_HUBS) {
+  const fetchHub = async (slug: string, requireAiKeyword: boolean) => {
     const url = `https://habr.com/ru/rss/hub/${slug}/all/?fl=ru`;
     try {
       const feed = await parser.parseURL(url);
@@ -29,8 +32,10 @@ export async function fetchHabr(): Promise<Candidate[]> {
         if (!item.link || seen.has(item.link)) continue;
         seen.add(item.link);
 
-        const text = `${item.title ?? ''} ${item.contentSnippet ?? ''}`.toLowerCase();
-        if (!AI_KEYWORDS.some((kw) => text.includes(kw))) continue;
+        if (requireAiKeyword) {
+          const text = `${item.title ?? ''} ${item.contentSnippet ?? ''}`.toLowerCase();
+          if (!AI_KEYWORDS.some((kw) => text.includes(kw))) continue;
+        }
 
         out.push({
           source: 'habr',
@@ -43,7 +48,10 @@ export async function fetchHabr(): Promise<Candidate[]> {
     } catch (e) {
       console.error(`habr hub ${slug} fetch failed:`, e);
     }
-  }
+  };
+
+  for (const slug of MARKETING_HUBS) await fetchHub(slug, false);
+  for (const slug of AI_HUBS) await fetchHub(slug, true);
   return out;
 }
 
