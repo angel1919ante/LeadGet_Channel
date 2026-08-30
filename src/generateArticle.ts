@@ -6,6 +6,7 @@ import { callLLM } from './llm.ts';
 import { articlePrompt, articlePromptFromTopic } from './articlePrompts.ts';
 import { loadToneSamples } from './toneSamples.ts';
 import { disconnectMTProto } from './mtproto.ts';
+import { fetchArticleText } from './sources.ts';
 import type { Platform } from './articleTypes.ts';
 import type { Candidate, Source } from './types.ts';
 
@@ -32,7 +33,9 @@ async function main(): Promise<void> {
     if (row.source === platform) {
       throw new Error(`Нельзя сделать статью для "${platform}" из новости с этой же площадки (источник: ${row.source}) — выбери другую площадку`);
     }
-    const candidate: Candidate = { source: row.source as Source, title: row.title, link: row.link, rating: row.rating, description: row.summary };
+    const fullText = await fetchArticleText(row.link);
+    console.log(fullText ? `fetched full source text (${fullText.length} chars)` : 'full source fetch failed, falling back to short summary');
+    const candidate: Candidate = { source: row.source as Source, title: row.title, link: row.link, rating: row.rating, description: fullText ?? row.summary };
     prompt = articlePrompt(candidate, platform, tone);
     sourceUrl = row.link;
     sourceTitle = row.title;

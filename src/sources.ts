@@ -152,6 +152,38 @@ export async function fetchRBC(): Promise<Candidate[]> {
   }
 }
 
+// Саммари в News (2-3 предложения для Telegram-поста) недостаточно для
+// полноформатной статьи — модель придумывает конкретику, которой в саммари
+// нет (реальный инцидент: 5 тестовых статей выдумали 5 разных "трёх ошибок"
+// в одном и том же источнике, ни одна не совпала с настоящими). Качаем
+// реальную страницу источника и достаём текст — модель не может открыть
+// ссылку сама, но мы можем скачать её и вставить текст в промпт.
+export async function fetchArticleText(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LeadGetBot/1.0; +https://lead-get.ru)' },
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const text = html
+      .replace(/<(script|style|nav|header|footer|aside)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<[^>]+>/g, '\n')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#0?39;/g, "'")
+      .replace(/&laquo;/g, '«')
+      .replace(/&raquo;/g, '»')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join('\n');
+    return text.length > 500 ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchAll(): Promise<Candidate[]> {
   const [habr, cossa, vc, rbc] = await Promise.all([
     fetchHabr(),

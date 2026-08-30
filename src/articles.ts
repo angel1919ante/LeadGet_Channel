@@ -7,6 +7,7 @@ import {
 import { callLLM } from './llm.ts';
 import { sendLong } from './telegram.ts';
 import { articlePrompt } from './articlePrompts.ts';
+import { fetchArticleText } from './sources.ts';
 import type { Platform } from './articleTypes.ts';
 import type { Candidate, Source } from './types.ts';
 
@@ -53,12 +54,13 @@ async function main(): Promise<void> {
   }> = [];
 
   for (const row of selected) {
+    const fullText = await fetchArticleText(row.link);
     const candidate: Candidate = {
       source: row.source as Source,
       title: row.title,
       link: row.link,
       rating: row.rating,
-      description: row.summary,
+      description: fullText ?? row.summary,
     };
 
     for (const platform of platformsFor(row.article)) {
