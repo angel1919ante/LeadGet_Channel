@@ -1,5 +1,12 @@
 name: Generate Articles
 
+# Общая группа со всеми остальными workflow'ами — делят одну Telegram-сессию
+# (MTProto), параллельный запуск ломает сессию. cancel-in-progress: false —
+# новый запуск встаёт в очередь, а не отменяет/не бежит поверх текущего.
+concurrency:
+  group: telegram-mtproto
+  cancel-in-progress: false
+
 on:
   schedule:
     # Каждые 3 дня в 09:00 МСК (06:00 UTC)

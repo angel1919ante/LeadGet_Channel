@@ -1,5 +1,12 @@
 name: LeadGet Channel Bot
 
+# Общая группа со всеми остальными workflow'ами — они делят одну Telegram-сессию
+# (MTProto), параллельный запуск ломает сессию. cancel-in-progress: false — новый
+# запуск встаёт в очередь и ждёт, а не отменяет/не бежит поверх текущего.
+concurrency:
+  group: telegram-mtproto
+  cancel-in-progress: false
+
 on:
   schedule:
     - cron: '0 7 * * *'  # 10:00 МСК — сбор новостей + скан кейсов

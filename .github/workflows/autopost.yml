@@ -1,5 +1,12 @@
 name: AutoPost
 
+# Общая группа со всеми остальными workflow'ами — делят одну Telegram-сессию
+# (MTProto), параллельный запуск ломает сессию. cancel-in-progress: false —
+# новый запуск встаёт в очередь, а не отменяет/не бежит поверх текущего.
+concurrency:
+  group: telegram-mtproto
+  cancel-in-progress: false
+
 on:
   schedule:
     - cron: '0 7-17 * * *' # каждый час 10:00–20:00 МСК (07:00–17:00 UTC)
