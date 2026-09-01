@@ -41,5 +41,13 @@ export async function callLLM(prompt: Prompt): Promise<string> {
   };
   const text = json.choices?.[0]?.message?.content?.trim();
   if (!text) throw new Error('OpenRouter returned empty content');
-  return text;
+  return stripEmDash(text);
+}
+
+// Промпты запрещают длинное тире, но модель не всегда следует инструкции —
+// это детерминированная страховка на все вызовы, а не полагание на промпт.
+// ponytail: тире просто заменяется на запятую, без учёта грамматики контекста —
+// если начнёт заметно портить текст, разбирать на реальных примерах отдельно.
+function stripEmDash(text: string): string {
+  return text.replace(/\s*—\s*/g, ', ').replace(/,\s*,/g, ',');
 }
