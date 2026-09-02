@@ -95,6 +95,18 @@ export async function getPlanRows(): Promise<PlanRow[]> {
   }));
 }
 
+// Посты только Пн/Ср/Пт/Вс, равномерно — никогда в другой день недели.
+// getDay(): 0=Вс, 1=Пн, 2=Вт, 3=Ср, 4=Чт, 5=Пт, 6=Сб.
+const ALLOWED_WEEKDAYS = new Set([1, 3, 5, 0]);
+
+function assertAllowedDay(dateStr: string): void {
+  const [d, m, y] = dateStr.split('.').map(Number);
+  const day = new Date(y, m - 1, d).getDay();
+  if (!ALLOWED_WEEKDAYS.has(day)) {
+    throw new Error(`Посты можно ставить только на Пн/Ср/Пт/Вс — ${dateStr} на другой день недели`);
+  }
+}
+
 export async function appendPlanRow(row: {
   date: string;
   type: string;
@@ -102,6 +114,7 @@ export async function appendPlanRow(row: {
   token: string;
   data: string;
 }): Promise<void> {
+  assertAllowedDay(row.date);
   const sheets = getClient();
   await sheets.spreadsheets.values.append({
     spreadsheetId: getSheetId(),
@@ -115,6 +128,7 @@ export async function setPlanRow(
   rowNumber: number,
   patch: { date?: string; type?: string; title?: string; token?: string; status?: string; data?: string; post?: string },
 ): Promise<void> {
+  if (patch.date !== undefined) assertAllowedDay(patch.date);
   const sheets = getClient();
   const data: sheets_v4.Schema$ValueRange[] = [];
   if (patch.date !== undefined) data.push({ range: `${CP_SHEET}!A${rowNumber}`, values: [[patch.date]] });

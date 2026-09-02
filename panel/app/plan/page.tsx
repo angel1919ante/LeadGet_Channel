@@ -303,12 +303,17 @@ export default function PlanPage() {
       patch.post = editDraft.post;
       patch.status = 'draft';
     }
-    await fetch('/api/plan', {
+    const res = await fetch('/api/plan', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(patch),
     });
     setSavingRow(null);
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      alert(json.error ?? 'Не получилось сохранить.');
+      return;
+    }
     setEditingRow(null);
     load();
   };
@@ -399,12 +404,17 @@ export default function PlanPage() {
       data = JSON.stringify({ problem: f.problem, description: f.description });
     }
     setCreating(true);
-    await fetch('/api/plan', {
+    const res = await fetch('/api/plan', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ create: true, date: toDMY(newDate), type: newType, title, token, data }),
     });
     setCreating(false);
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      alert(json.error ?? 'Не получилось создать строку плана.');
+      return;
+    }
     setFormOpen(false);
     setNewDate('');
     setNewToken('');

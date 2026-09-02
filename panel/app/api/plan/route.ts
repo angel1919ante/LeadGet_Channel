@@ -49,6 +49,15 @@ export async function GET() {
 export async function POST(req: Request) {
   const body = await req.json();
 
+  try {
+    return await handlePost(body);
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function handlePost(body: any): Promise<NextResponse> {
   if (body.create) {
     await appendPlanRow({
       date: body.date,
