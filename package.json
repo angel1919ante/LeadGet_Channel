@@ -13,7 +13,8 @@
     "scan-cases": "tsx src/caseScanner.ts",
     "learn": "tsx src/learn.ts",
     "delete-post": "tsx src/deletePost.ts",
-    "review-article": "tsx src/postArticleForReview.ts"
+    "review-article": "tsx src/postArticleForReview.ts",
+    "post-article-text-direct": "tsx src/_postArticleTextDirect.ts"
   },
   "dependencies": {
     "googleapis": "^144.0.0",
