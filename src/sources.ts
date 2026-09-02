@@ -4,39 +4,30 @@ import type { Candidate } from './types.ts';
 const parser = new Parser();
 
 // MARKETING_HUBS — реально по теме канала (маркетинг/реклама), берём все
-// статьи без keyword-фильтра, как cossa/vc/rbc. AI_HUBS — общий AI/ML-хаб,
-// тематически шире канала, поэтому дополнительно фильтруем по ключевым
-// словам, чтобы не тащить чистую разработку/матан. Раньше был только
-// AI_HUBS — из-за этого 29-30.08 collect дал 0 новостей два дня подряд:
-// весь пул кандидатов был про LLM/RAG/файн-тюнинг, ничего про маркетинг,
-// LLM-оценка релевантности справедливо резала всё по порогу.
+// статьи без keyword-фильтра, как cossa/vc/rbc.
+//
+// Раньше здесь были ещё и AI_HUBS (artificial_intelligence, machine_learning)
+// с гейтом по AI-ключевым словам — идея была не тащить чистую разработку.
+// На практике гейт почти не фильтровал: в AI/ML-хабе почти любая статья и
+// так упоминает "ии"/"нейросеть", так что проходило 60-80 из ~100
+// кандидатов за прогон, а по теме канала (лидогенерация/маркетинг) из них
+// не подходило почти ничего — 2-4 из 10 по релевантности. AI_HUBS топили
+// нормальный internetmarketing-хаб в шуме и жгли LLM-вызовы впустую.
+// Убраны, MARKETING_HUBS одного хаба хватает (см. git log для истории).
 const MARKETING_HUBS = ['internetmarketing'];
-const AI_HUBS = ['artificial_intelligence', 'machine_learning'];
 
 // Рейтинг статьи раньше парсили regex'ом со страницы Хабра — вёрстка
 // поменялась, regex молча возвращал 0 и резал 100% кандидатов. Скрейпинг
 // ненадёжен, поэтому просто не фильтруем по рейтингу вообще.
 export async function fetchHabr(): Promise<Candidate[]> {
-  const seen = new Set<string>();
   const out: Candidate[] = [];
-  const AI_KEYWORDS = [
-    'ии', 'искусственный интеллект', 'нейросет', 'chatgpt', 'gpt',
-    'llm', 'машинное обучение', 'machine learning', 'ai-агент', 'ai агент',
-  ];
 
-  const fetchHub = async (slug: string, requireAiKeyword: boolean) => {
+  for (const slug of MARKETING_HUBS) {
     const url = `https://habr.com/ru/rss/hub/${slug}/all/?fl=ru`;
     try {
       const feed = await parser.parseURL(url);
       for (const item of feed.items) {
-        if (!item.link || seen.has(item.link)) continue;
-        seen.add(item.link);
-
-        if (requireAiKeyword) {
-          const text = `${item.title ?? ''} ${item.contentSnippet ?? ''}`.toLowerCase();
-          if (!AI_KEYWORDS.some((kw) => text.includes(kw))) continue;
-        }
-
+        if (!item.link) continue;
         out.push({
           source: 'habr',
           title: item.title ?? '(без заголовка)',
@@ -48,10 +39,7 @@ export async function fetchHabr(): Promise<Candidate[]> {
     } catch (e) {
       console.error(`habr hub ${slug} fetch failed:`, e);
     }
-  };
-
-  for (const slug of MARKETING_HUBS) await fetchHub(slug, false);
-  for (const slug of AI_HUBS) await fetchHub(slug, true);
+  }
   return out;
 }
 
