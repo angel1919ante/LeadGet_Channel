@@ -20,23 +20,8 @@ on:
         options:
           - collect
           - publish
-          - set-threshold
 
 jobs:
-  set-threshold:
-    if: github.event.inputs.job == 'set-threshold'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm ci
-      - run: npx tsx src/_setThreshold.ts
-        env:
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-
   collect:
     if: github.event.schedule == '0 7 * * *' || github.event.inputs.job == 'collect'
     runs-on: ubuntu-latest
